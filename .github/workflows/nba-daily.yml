@@ -1,0 +1,63 @@
+name: 🏀 NBA Daily Newsletter
+
+on:
+  schedule:
+    # Run every day at 7:30 AM UTC (adjust timezone as needed)
+    # For Europe/Paris (UTC+1 or UTC+2), this is 6:30 or 8:30 AM
+    # GitHub Actions uses UTC, so 07:30 UTC ≈ 8:30 AM Paris (summer) or 8:30 AM (winter adjusted)
+    - cron: '30 7 * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  nba-newsletter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: 🚀 Generate and send newsletter
+        env:
+          MAIL_SMTP_HOST: ${{ secrets.MAIL_SMTP_HOST }}
+          MAIL_SMTP_PORT: ${{ secrets.MAIL_SMTP_PORT }}
+          MAIL_SMTP_USER: ${{ secrets.MAIL_SMTP_USER }}
+          MAIL_SMTP_PASSWORD: ${{ secrets.MAIL_SMTP_PASSWORD }}
+          NEWS_RECIPIENT: ${{ secrets.NEWS_RECIPIENT }}
+          TIMEZONE: ${{ secrets.TIMEZONE }}
+          BOT_RUN_TIME: ${{ secrets.BOT_RUN_TIME }}
+          BALLDONTLIE_API_KEY: ${{ secrets.BALLDONTLIE_API_KEY }}
+          USE_HF_INF_API: ${{ secrets.USE_HF_INF_API }}
+          HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
+          MODEL_ID: ${{ secrets.MODEL_ID }}
+          MAX_TOKENS: ${{ secrets.MAX_TOKENS }}
+          CACHE_PATH: ${{ secrets.CACHE_PATH }}
+        run: |
+          python run.py once
+      
+      - name: 📤 Upload newsletter output
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: newsletter
+          path: out/
+          retention-days: 30
+      
+      - name: 📊 Show logs
+        if: failure()
+        run: |
+          echo "❌ Newsletter generation failed. Check logs above."
+          exit 1

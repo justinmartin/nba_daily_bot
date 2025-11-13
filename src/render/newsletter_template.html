@@ -1,0 +1,90 @@
+<!-- src/render/newsletter_template.html -->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>NBA Daily — {{ date }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; padding: 16px; }
+      .card { border-radius: 8px; padding: 12px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+      .score { font-weight:700; }
+      table { width:100%; border-collapse:collapse; }
+      td, th { padding:6px 8px; text-align:left; border:1px solid #ddd; }
+      th { background-color:#f0f0f0; }
+      h2 { color:#1e3a8a; }
+      h3 { margin-top:0; }
+    </style>
+  </head>
+  <body>
+    <h2>NBA Daily — {{ date }}</h2>
+
+    <!-- Scores -->
+    <div class="card">
+      <h3>Scores de la nuit</h3>
+      {% if games %}
+      <table>
+        <thead><tr><th>Match</th><th>Score</th></tr></thead>
+        <tbody>
+          {% for g in games %}
+          <tr>
+            <td>{{ g.away_team }} @ {{ g.home_team }}</td>
+            <td class="score">{{ g.away_score }} — {{ g.home_score }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>Aucun match trouvé pour cette date.</p>
+      {% endif %}
+    </div>
+
+    <!-- Top Performers -->
+    <div class="card">
+      <h3>Top Performers</h3>
+      {% if top_performers %}
+      <table>
+        <thead>
+          <tr>
+            <th>Joueur</th>
+            <th>Équipe</th>
+            <th>PTS</th>
+            <th>REB</th>
+            <th>AST</th>
+            <th>FG%</th>
+            <th>3PT%</th>
+            <th>+/-</th>
+            <th>BLK</th>
+            <th>STL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in top_performers %}
+          <tr>
+            <td>{{ p.name }}</td>
+            <td>{{ p.team }}</td>
+            <td>{{ p.pts }}</td>
+            <td>{{ p.reb }}</td>
+            <td>{{ p.ast }}</td>
+            <td>{{ p.fg_pct }}</td>
+            <td>{{ p.fg3_pct }}</td>
+            <td>{{ p["+/-"] }}</td>
+            <td>{{ p.blk if p.blk is defined else "-" }}</td>
+            <td>{{ p.stl if p.stl is defined else "-" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="font-style:italic;">Aucun top performer trouvé.</p>
+      {% endif %}
+    </div>
+
+    <!-- Résumé du LLM -->
+    <div class="card">
+      <h3>Résumé</h3>
+      <div>{{ summary | safe }}</div>
+    </div>
+
+    <footer style="color:#666; font-size:12px;">Généré automatiquement — projet open-source</footer>
+  </body>
+</html>
