@@ -67,7 +67,7 @@ TODAY'S TOP HEADLINES:
 
 YOUR ASSIGNMENT:
 You are an NBA journalists, with a style like the French media 'Trashtalk''s journalists can do, write a 10 minutes newsletter summary that:
-1. Highlights the biggest upsets and dominant performances
+1. Highlights the biggest upsets and dominant performances, without creating sections/titles whatsoever, without formatting either, only paragraphs.
 2. Roasts the losing teams with little humor
 3. Hypes up the star performances (especially the ones provided in the match details)
 4. Includes sarcastic commentary on the day's trends
@@ -145,18 +145,32 @@ def format_performers_for_prompt(organized_games):
     performers_text = "MATCH DETAILS WITH TOP PERFORMERS:\n"
     
     for game in organized_games:
-        performers_text += f"\n• {game['winner']} {game['winner_score']} - {game['loser']} {game['loser_score']}\n"
+        performers_text += f"\n• {game['winner']} ({game['winner_record']}) {game['winner_score']} - {game['loser_score']} {game['loser']} ({game['loser_record']}) | Margin: {game['margin']}pts\n"
         
         if game['winner_top_performers']:
             performers_text += "  🏆 Winner's stars:\n"
             for p in game['winner_top_performers']:
-                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast"
+                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}"
+                blk_stl = []
+                if p.get('blk'):
+                    blk_stl.append(f"{p.get('blk')}blk")
+                if p.get('stl'):
+                    blk_stl.append(f"{p.get('stl')}stl")
+                if blk_stl:
+                    stats += f", {', '.join(blk_stl)}"
                 performers_text += f"    - {p['name']}: {stats}\n"
         
         if game['loser_top_performers']:
             performers_text += "  Leading loser:\n"
             for p in game['loser_top_performers']:
-                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast"
+                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}"
+                blk_stl = []
+                if p.get('blk'):
+                    blk_stl.append(f"{p.get('blk')}blk")
+                if p.get('stl'):
+                    blk_stl.append(f"{p.get('stl')}stl")
+                if blk_stl:
+                    stats += f", {', '.join(blk_stl)}"
                 performers_text += f"    - {p['name']}: {stats}\n"
     
     return performers_text
@@ -192,6 +206,17 @@ def run(dry_run=False):
         
         # Organize game data with performers
         logger.info("📊 Organizing game data with top performers...")
+        
+        # DEBUG: Log performers info
+        logger.info(f"Total performers fetched: {len(all_top_performers)}")
+        for perf in all_top_performers[:3]:  # Log first 3
+            logger.info(f"  Performer: {perf.get('name')} from {perf.get('team')}")
+        
+        # DEBUG: Log game teams
+        logger.info(f"Games teams:")
+        for g in games:
+            logger.info(f"  {g.home_team} vs {g.away_team}")
+        
         organized_games = organize_game_data(games, all_top_performers)
         
         # Build prompt and generate summary

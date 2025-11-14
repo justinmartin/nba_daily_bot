@@ -215,31 +215,33 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     if organized_games:
         html += """
                 <div class="section">
-                    <h2>📊 GAME RESULTS</h2>
+                    <h2>📊 GAME RESULTS & MATCH DETAILS</h2>
                     <div class="scores-list">"""
         
         for game in organized_games:
             html += f"""
                         <div class="score-item">
                             <div class="teams">
-                                🆆 {game['winner']} ({game['winner_record']}) @ 🅻 {game['loser']} ({game['loser_record']})
+                                🆆 {game['winner']} ({game['winner_record']}) {game['winner_score']} - {game['loser_score']} 🅻 {game['loser']} ({game['loser_record']})
                             </div>
-                            <div class="result">{game['winner_score']} - {game['loser_score']}</div>"""
+                            <div class="result" style="margin-top: 8px;">
+                                <strong>Margin:</strong> {game['margin']} points
+                            </div>"""
             
             # Add top performers for winner
             if game['winner_top_performers']:
-                html += "<div style='margin-top: 8px; font-size: 12px; color: #666;'><strong>🏆 Stars:</strong> "
-                stars = []
+                html += "<div style='margin-top: 8px; font-size: 12px; color: #2d5016;'><strong>🏆 Winner's stars:</strong><br>"
                 for p in game['winner_top_performers']:
-                    stars.append(f"{p['name']} ({p.get('pts', 0)}pts)")
-                html += ", ".join(stars)
+                    stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast"
+                    html += f"&nbsp;&nbsp;• {p['name']}: {stats}<br>"
                 html += "</div>"
             
             # Add best performer for loser
             if game['loser_top_performers']:
-                html += "<div style='margin-top: 4px; font-size: 12px; color: #999;'><strong>Leading loser:</strong> "
+                html += "<div style='margin-top: 4px; font-size: 12px; color: #666;'><strong>Leading loser:</strong><br>"
                 p = game['loser_top_performers'][0]
-                html += f"{p['name']} ({p.get('pts', 0)}pts)"
+                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast"
+                html += f"&nbsp;&nbsp;• {p['name']}: {stats}<br>"
                 html += "</div>"
             
             html += """
@@ -277,12 +279,15 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                     </div>
                 </div>"""
     
-    # Add top performers section
+    # Add top performers section (top 5 overall)
     html += """
                 <div class="section">
-                    <h2>👑 TOP PERFORMERS</h2>"""
+                    <h2>👑 TOP 5 PERFORMERS OF THE NIGHT</h2>"""
     
     if top_performers:
+        # Get top 5 by points
+        sorted_performers = sorted(top_performers, key=lambda x: x.get('pts', 0), reverse=True)[:5]
+        
         html += """
                     <table>
                         <thead>
@@ -300,7 +305,7 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                         </thead>
                         <tbody>"""
         
-        for p in top_performers:
+        for p in sorted_performers:
             blk_stl = []
             if "blk" in p:
                 blk_stl.append(f"{p['blk']} BLK")

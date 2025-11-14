@@ -31,7 +31,7 @@ def get_top_performers(game_id, limit=5, target_date=None):
     except Exception as e:
         logger.debug(f"BallDontLie failed: {e}")
     
-    logger.debug(f"⚠️ No player stats available for game {game_id}")
+    logger.warning(f"⚠️ No player stats available for game {game_id}")
     return []
 
 
