@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def render_email(summary_text, news, top_performers=None, games=None):
+def render_email(summary_text, news, top_performers=None, games=None, organized_games=None):
     """Render newsletter HTML email."""
     
     if not summary_text or not summary_text.strip():
@@ -19,6 +19,9 @@ def render_email(summary_text, news, top_performers=None, games=None):
         
     if games is None:
         games = []
+    
+    if organized_games is None:
+        organized_games = []
     
     today = datetime.now().strftime("%A, %B %d %Y")
     summary_html = summary_text.replace("\n", "<br>")
@@ -209,7 +212,44 @@ def render_email(summary_text, news, top_performers=None, games=None):
                 </div>"""
     
     # Add games section
-    if games:
+    if organized_games:
+        html += """
+                <div class="section">
+                    <h2>📊 GAME RESULTS</h2>
+                    <div class="scores-list">"""
+        
+        for game in organized_games:
+            html += f"""
+                        <div class="score-item">
+                            <div class="teams">
+                                🆆 {game['winner']} ({game['winner_record']}) @ 🅻 {game['loser']} ({game['loser_record']})
+                            </div>
+                            <div class="result">{game['winner_score']} - {game['loser_score']}</div>"""
+            
+            # Add top performers for winner
+            if game['winner_top_performers']:
+                html += "<div style='margin-top: 8px; font-size: 12px; color: #666;'><strong>🏆 Stars:</strong> "
+                stars = []
+                for p in game['winner_top_performers']:
+                    stars.append(f"{p['name']} ({p.get('pts', 0)}pts)")
+                html += ", ".join(stars)
+                html += "</div>"
+            
+            # Add best performer for loser
+            if game['loser_top_performers']:
+                html += "<div style='margin-top: 4px; font-size: 12px; color: #999;'><strong>Leading loser:</strong> "
+                p = game['loser_top_performers'][0]
+                html += f"{p['name']} ({p.get('pts', 0)}pts)"
+                html += "</div>"
+            
+            html += """
+                        </div>"""
+        
+        html += """
+                    </div>
+                </div>"""
+    elif games:
+        # Fallback to old format if organized_games not available
         html += """
                 <div class="section">
                     <h2>📊 GAME RESULTS</h2>

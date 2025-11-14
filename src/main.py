@@ -46,6 +46,9 @@ def build_prompt(games, news, top_performers):
     close_games = sum(1 for g in games if abs(g.home_score - g.away_score) <= 5)
     blowouts = sum(1 for g in games if abs(g.home_score - g.away_score) > 15)
     
+    # Build performers section
+    performers_section = format_performers_for_prompt(organize_game_data(games, top_performers))
+    
     # Build a DETAILED prompt that generates longer, more comprehensive content
     prompt = f"""You are a sports journalist writing for TRASHTALK MAGAZINE - a witty, sarcastic NBA news outlet.
 
@@ -57,21 +60,26 @@ GAME STATS:
 - Blowouts (>15 pt margin): {blowouts}
 - Close games (≤5 pt margin): {close_games}
 
+{performers_section}
+
 TODAY'S TOP HEADLINES:
 {news_headlines}
 
 YOUR ASSIGNMENT:
-You are an NBA journalists, like the French media 'Trashtalk''s journalists can do, write a 10 minutes newsletter summary that:
+You are an NBA journalists, with a style like the French media 'Trashtalk''s journalists can do, write a 10 minutes newsletter summary that:
 1. Highlights the biggest upsets and dominant performances
 2. Roasts the losing teams with little humor
-3. Hypes up the star performances
+3. Hypes up the star performances (especially the ones provided in the match details)
 4. Includes sarcastic commentary on the day's trends
 5. References at multiple of today's headlines
 6. Uses vivid, entertaining language, staying professional
 7. NO generic sports clichés or boring phrases, no emojis whatsoever
+8. Add detailed statistics and data from the games to support your points IF AND ONLY IF you have the data from the games and not old data. I'd rather have no data than false data.
 Do not hesitate to bounce back on the Headlines and tendencies of the day and in the NBA
-Do not hesitate to add data and statistics to support your points.
+Do not hesitate to reference the top performers data provided to add credibility and excitement to your coverage. Use real data from the games, not made-up figures or old ones. I'd rather have no data than false data.
 Do not introduce yourself or the newsletter at the beginning, go straight to the point.
+Do not write sections or format characters, my goal is to put the text directly in a newsletter that is sent automatically.
+Do not put titles or sections in the newsletter, and do not conclude with a sign-off.
 
 TONE: Profesional and Sharp, witty and serious, entertaining and factual, you love NBA drama, but you want to inform your readers first.
 STYLE: Mix facts with a bit of personality, be bold and opinionated, but stay professional before all.
@@ -80,6 +88,78 @@ LENGTH: Make it substantial - give readers real insights with entertainment valu
 NOW WRITE:"""
     
     return prompt
+
+def organize_game_data(games, all_performers):
+    """
+    Organize game data with top performers grouped by match.
+    Returns list of dicts with: winner, loser, scores, records, and their top performers.
+    """
+    organized_games = []
+    
+    for game in games:
+        # Determine winner and loser
+        is_home_winner = game.home_score > game.away_score
+        winner_name = game.home_team if is_home_winner else game.away_team
+        loser_name = game.away_team if is_home_winner else game.home_team
+        winner_score = game.home_score if is_home_winner else game.away_score
+        loser_score = game.away_score if is_home_winner else game.home_score
+        
+        # Get records (handle None values)
+        if is_home_winner:
+            winner_record = f"{game.home_wins}-{game.home_losses}" if (game.home_wins and game.home_losses) else "?"
+            loser_record = f"{game.away_wins}-{game.away_losses}" if (game.away_wins and game.away_losses) else "?"
+        else:
+            winner_record = f"{game.away_wins}-{game.away_losses}" if (game.away_wins and game.away_losses) else "?"
+            loser_record = f"{game.home_wins}-{game.home_losses}" if (game.home_wins and game.home_losses) else "?"
+        
+        # Get top performers for this game (filter by team)
+        winner_performers = [p for p in all_performers if p['team'] == winner_name][:3]
+        loser_performers = [p for p in all_performers if p['team'] == loser_name][:1]
+        
+        # Sort by points to ensure we get the best
+        winner_performers = sorted(winner_performers, key=lambda x: x.get('pts', 0), reverse=True)[:3]
+        loser_performers = sorted(loser_performers, key=lambda x: x.get('pts', 0), reverse=True)[:1]
+        
+        game_data = {
+            "id": game.id,
+            "date": game.date,
+            "winner": winner_name,
+            "loser": loser_name,
+            "winner_score": winner_score,
+            "loser_score": loser_score,
+            "margin": abs(winner_score - loser_score),
+            "winner_record": winner_record,
+            "loser_record": loser_record,
+            "winner_top_performers": winner_performers,
+            "loser_top_performers": loser_performers
+        }
+        organized_games.append(game_data)
+    
+    return organized_games
+
+def format_performers_for_prompt(organized_games):
+    """Format organized game data with performers for the LLM prompt."""
+    if not organized_games:
+        return ""
+    
+    performers_text = "MATCH DETAILS WITH TOP PERFORMERS:\n"
+    
+    for game in organized_games:
+        performers_text += f"\n• {game['winner']} {game['winner_score']} - {game['loser']} {game['loser_score']}\n"
+        
+        if game['winner_top_performers']:
+            performers_text += "  🏆 Winner's stars:\n"
+            for p in game['winner_top_performers']:
+                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast"
+                performers_text += f"    - {p['name']}: {stats}\n"
+        
+        if game['loser_top_performers']:
+            performers_text += "  Leading loser:\n"
+            for p in game['loser_top_performers']:
+                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast"
+                performers_text += f"    - {p['name']}: {stats}\n"
+    
+    return performers_text
 
 def run(dry_run=False):
     """Main function to generate and send NBA daily newsletter."""
@@ -110,6 +190,10 @@ def run(dry_run=False):
         logger.info("📰 Fetching news...")
         news = fetch_news(limit=5)
         
+        # Organize game data with performers
+        logger.info("📊 Organizing game data with top performers...")
+        organized_games = organize_game_data(games, all_top_performers)
+        
         # Build prompt and generate summary
         logger.info("🤖 Generating newsletter content...")
         prompt = build_prompt(games, news, all_top_performers)
@@ -121,7 +205,7 @@ def run(dry_run=False):
         
         # Render HTML
         logger.info("🎨 Rendering newsletter HTML...")
-        html = render_email(summary, news, all_top_performers, games)
+        html = render_email(summary, news, all_top_performers, games, organized_games)
         
         # Save to file
         os.makedirs("out", exist_ok=True)
