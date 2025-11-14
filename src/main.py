@@ -206,17 +206,6 @@ def run(dry_run=False):
         
         # Organize game data with performers
         logger.info("📊 Organizing game data with top performers...")
-        
-        # DEBUG: Log performers info
-        logger.info(f"Total performers fetched: {len(all_top_performers)}")
-        for perf in all_top_performers[:3]:  # Log first 3
-            logger.info(f"  Performer: {perf.get('name')} from {perf.get('team')}")
-        
-        # DEBUG: Log game teams
-        logger.info(f"Games teams:")
-        for g in games:
-            logger.info(f"  {g.home_team} vs {g.away_team}")
-        
         organized_games = organize_game_data(games, all_top_performers)
         
         # Build prompt and generate summary

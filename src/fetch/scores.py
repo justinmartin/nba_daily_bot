@@ -1,19 +1,13 @@
 from dataclasses import dataclass
-import requests
-from datetime import date
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 import logging
-from src.config import Config
+from datetime import date
 
 logger = logging.getLogger(__name__)
-cfg = Config()
 
-BASE = "https://api.balldontlie.io/v1"
 
 @dataclass
 class Game:
-    id: int
+    id: str
     date: str
     home_team: str
     away_team: str
@@ -24,58 +18,85 @@ class Game:
     away_wins: int = None
     away_losses: int = None
 
-def _get_session_with_retries():
-    """Create a requests session with retry logic."""
-    session = requests.Session()
-    retry_strategy = Retry(
-        total=3,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["GET"]
-    )
-    adapter = HTTPAdapter(max_retries=retry_strategy)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    return session
+
+# Team ID to name mapping
+TEAM_MAP = {
+    1610612737: "Hawks", 1610612738: "Celtics", 1610612739: "Cavaliers", 1610612740: "Pelicans",
+    1610612741: "Bulls", 1610612742: "Mavericks", 1610612743: "Grizzlies", 1610612744: "Warriors",
+    1610612745: "Rockets", 1610612746: "Clippers", 1610612747: "Lakers", 1610612748: "Heat",
+    1610612749: "Bucks", 1610612750: "Timberwolves", 1610612751: "Nets", 1610612752: "Knicks",
+    1610612753: "Magic", 1610612754: "76ers", 1610612755: "76ers", 1610612756: "Suns",
+    1610612757: "Trail Blazers", 1610612758: "Kings", 1610612759: "Spurs", 1610612760: "Thunder",
+    1610612761: "Raptors", 1610612762: "Jazz", 1610612763: "Grizzlies", 1610612764: "Wizards",
+    1610612765: "Hawks", 1610612766: "Hornets"
+}
+
 
 def get_games_by_date(d: date):
-    """Fetch NBA games for a given date with retry logic."""
+    """Fetch NBA games for a given date using stats.nba.com (no API key needed)."""
     try:
-        session = _get_session_with_retries()
-        headers = {}
-        if cfg.BALLDONTLIE_API_KEY:
-            headers["Authorization"] = f"Bearer {cfg.BALLDONTLIE_API_KEY}"
+        from nba_api.stats.endpoints import ScoreboardV2, BoxScoreSummaryV3
         
-        resp = session.get(
-            f"{BASE}/games", 
-            params={"dates[]": d.isoformat(), "per_page": 100},
-            headers=headers,
-            timeout=10
-        )
-        resp.raise_for_status()
-    except requests.exceptions.RequestException as e:
+        date_str = d.strftime('%Y-%m-%d')
+        logger.debug(f"Fetching games for {date_str} from stats.nba.com...")
+        
+        # Get scoreboard for the date
+        sb = ScoreboardV2(game_date=date_str)
+        games_df = sb.get_data_frames()[0]
+        
+        if games_df.empty:
+            logger.warning(f"⚠️ No games found for {date_str}")
+            return []
+        
+        games = []
+        for idx, row in games_df.iterrows():
+            try:
+                game_id = str(row['GAME_ID']).zfill(10)
+                home_team_id = row['HOME_TEAM_ID']
+                away_team_id = row['VISITOR_TEAM_ID']
+                
+                # Map team IDs to names
+                home_team = TEAM_MAP.get(home_team_id, f"Team{home_team_id}")
+                away_team = TEAM_MAP.get(away_team_id, f"Team{away_team_id}")
+                
+                # Get scores from box score summary (V3)
+                home_score = 0
+                away_score = 0
+                
+                try:
+                    box_summary = BoxScoreSummaryV3(game_id=game_id)
+                    line_score = box_summary.get_data_frames()[1]
+                    
+                    if not line_score.empty and 'PTS' in line_score.columns:
+                        home_score = int(line_score.iloc[0]['PTS'])
+                        away_score = int(line_score.iloc[1]['PTS'])
+                except:
+                    pass
+                
+                game = Game(
+                    id=game_id,
+                    date=date_str,
+                    home_team=home_team,
+                    away_team=away_team,
+                    home_score=home_score,
+                    away_score=away_score,
+                    home_wins=None,
+                    home_losses=None,
+                    away_wins=None,
+                    away_losses=None
+                )
+                
+                games.append(game)
+            except Exception as e:
+                logger.warning(f"⚠️ Error parsing game: {e}")
+                continue
+        
+        logger.info(f"✅ Fetched {len(games)} games for {date_str}")
+        return games
+        
+    except ImportError:
+        logger.error("❌ nba-api not installed")
+        raise
+    except Exception as e:
         logger.error(f"❌ Failed to fetch games for {d}: {e}")
         raise
-    
-    data = resp.json().get("data", [])
-    games = []
-    for g in data:
-        try:
-            games.append(Game(
-                id=g["id"],
-                date=g["date"],
-                home_team=g["home_team"]["full_name"],
-                away_team=g["visitor_team"]["full_name"],
-                home_score=g["home_team_score"],
-                away_score=g["visitor_team_score"],
-                home_wins=g.get("home_team", {}).get("wins"),
-                home_losses=g.get("home_team", {}).get("losses"),
-                away_wins=g.get("visitor_team", {}).get("wins"),
-                away_losses=g.get("visitor_team", {}).get("losses")
-            ))
-        except KeyError as e:
-            logger.warning(f"⚠️ Missing expected field in game data: {e}")
-            continue
-    
-    logger.info(f"✅ Fetched {len(games)} games for {d}")
-    return games
