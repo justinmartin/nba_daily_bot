@@ -7,13 +7,60 @@ logger = logging.getLogger(__name__)
 
 def get_top_performers(game_id, limit=5, target_date=None):
     """
-    Get top performers for a given date using stats.nba.com (single source).
-    Ignores game_id parameter and fetches all performers for target_date.
+    Get top performers using stats.nba.com (single source).
+    If game_id provided and not empty, get performers from that game.
+    If game_id empty, get top performers globally for the date.
     """
     if target_date is None:
         target_date = date.today()
     
-    return _get_from_stats_nba(limit, target_date)
+    if game_id and game_id != "":
+        return _get_performers_for_game(game_id, limit)
+    else:
+        return _get_from_stats_nba(limit, target_date)
+
+
+def _get_performers_for_game(game_id, limit=5):
+    """
+    Get top performers for a specific game.
+    """
+    try:
+        from nba_api.stats.endpoints import BoxScoreTraditionalV3
+        
+        logger.debug(f"Fetching performers for game {game_id}...")
+        
+        try:
+            box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=10)
+            player_stats = box_score.get_data_frames()[0]
+        except:
+            # If timeout, try once more with longer timeout
+            try:
+                box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=20)
+                player_stats = box_score.get_data_frames()[0]
+            except Exception as e:
+                logger.debug(f"⚠️ Failed to fetch performers for game {game_id}: {e}")
+                return []
+        
+        if player_stats.empty:
+            return []
+        
+        all_performers = []
+        
+        # Parse each player's stats
+        for p_idx, player_row in player_stats.iterrows():
+            performer = _parse_player_stats(player_row, None)
+            if performer and performer.get('pts', 0) > 0:  # Only include players who scored
+                all_performers.append(performer)
+        
+        # Sort by points and return top N
+        all_performers.sort(key=lambda x: float(x.get('pts', 0)), reverse=True)
+        top_performers = all_performers[:limit]
+        
+        return top_performers
+        
+    except Exception as e:
+        logger.debug(f"⚠️ Error fetching performers for game {game_id}: {e}")
+        return []
 
 
 def _get_from_stats_nba(limit=5, target_date=None):

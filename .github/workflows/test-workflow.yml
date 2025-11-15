@@ -1,0 +1,77 @@
+name: 🧪 Test Workflow (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Enable debug logging'
+        required: false
+        default: 'false'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: ✅ Verify bot setup
+        run: |
+          python << 'PYTEST'
+          from datetime import date, timedelta
+          from src.config import Config
+          from src.fetch.scores import get_games_by_date
+          from src.fetch.news import fetch_news
+          
+          print("🔍 Verifying bot components...")
+          cfg = Config()
+          print(f"✅ Config: HF_API_TOKEN={'✓' if cfg.HF_API_TOKEN else '✗'}")
+          print(f"✅ Recipient: {cfg.NEWS_RECIPIENT}")
+          
+          target = (date.today() - timedelta(days=1))
+          games = get_games_by_date(target)
+          print(f"✅ Games: {len(games)} games found for {target}")
+          
+          news = fetch_news(limit=3)
+          print(f"✅ News: {len(news)} articles fetched")
+          print("✨ All systems operational!")
+          PYTEST
+      
+      - name: 🚀 Generate newsletter (test mode)
+        env:
+          MAIL_SMTP_HOST: ${{ secrets.MAIL_SMTP_HOST }}
+          MAIL_SMTP_PORT: ${{ secrets.MAIL_SMTP_PORT }}
+          MAIL_SMTP_USER: ${{ secrets.MAIL_SMTP_USER }}
+          MAIL_SMTP_PASSWORD: ${{ secrets.MAIL_SMTP_PASSWORD }}
+          NEWS_RECIPIENT: ${{ secrets.NEWS_RECIPIENT }}
+          HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
+          MODEL_ID: ${{ secrets.MODEL_ID }}
+          MAX_TOKENS: ${{ secrets.MAX_TOKENS }}
+          USE_HF_INF_API: ${{ secrets.USE_HF_INF_API }}
+        run: |
+          echo "🧪 Running in test mode (dry run)..."
+          python run.py once
+      
+      - name: 📤 Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-newsletter
+          path: out/
+          retention-days: 7
+      
+      - name: ✅ Test completed
+        run: echo "✨ Workflow test completed successfully!"

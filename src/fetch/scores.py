@@ -59,24 +59,35 @@ def get_games_by_date(d: date):
                 home_team = TEAM_MAP.get(home_team_id, f"Team{home_team_id}")
                 away_team = TEAM_MAP.get(away_team_id, f"Team{away_team_id}")
                 
-                # Get scores from box score summary (V3)
+                # Get scores and records from box score summary (V3)
                 home_score = 0
                 away_score = 0
+                home_wins = None
+                home_losses = None
+                away_wins = None
+                away_losses = None
                 
                 try:
                     box_summary = BoxScoreSummaryV3(game_id=game_id)
-                    # Dataframe 4 contains team stats with scores
-                    team_stats = box_summary.get_data_frames()[4]
+                    data_frames = box_summary.get_data_frames()
                     
-                    if not team_stats.empty and 'score' in team_stats.columns:
-                        # Find home and away scores
-                        for idx_ts, row_ts in team_stats.iterrows():
-                            if row_ts['teamId'] == home_team_id:
-                                home_score = int(row_ts['score'])
-                            elif row_ts['teamId'] == away_team_id:
-                                away_score = int(row_ts['score'])
-                except:
-                    pass
+                    # Dataframe 4 contains team stats with scores
+                    if len(data_frames) > 4:
+                        team_stats = data_frames[4]
+                        
+                        if not team_stats.empty and 'score' in team_stats.columns:
+                            # Find home and away scores and records
+                            for idx_ts, row_ts in team_stats.iterrows():
+                                if row_ts['teamId'] == home_team_id:
+                                    home_score = int(row_ts['score'])
+                                    home_wins = int(row_ts.get('wins', 0)) if 'wins' in row_ts else None
+                                    home_losses = int(row_ts.get('losses', 0)) if 'losses' in row_ts else None
+                                elif row_ts['teamId'] == away_team_id:
+                                    away_score = int(row_ts['score'])
+                                    away_wins = int(row_ts.get('wins', 0)) if 'wins' in row_ts else None
+                                    away_losses = int(row_ts.get('losses', 0)) if 'losses' in row_ts else None
+                except Exception as e:
+                    logger.debug(f"Could not extract records for game {game_id}: {e}")
                 
                 game = Game(
                     id=game_id,
@@ -85,10 +96,10 @@ def get_games_by_date(d: date):
                     away_team=away_team,
                     home_score=home_score,
                     away_score=away_score,
-                    home_wins=None,
-                    home_losses=None,
-                    away_wins=None,
-                    away_losses=None
+                    home_wins=home_wins,
+                    home_losses=home_losses,
+                    away_wins=away_wins,
+                    away_losses=away_losses
                 )
                 
                 games.append(game)

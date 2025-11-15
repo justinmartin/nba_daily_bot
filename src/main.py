@@ -131,12 +131,18 @@ def organize_game_data(games, all_performers):
         loser_tricode = NAME_TO_TRICODE.get(loser_name, loser_name)
         
         # Get top performers for this game (filter by team tricode)
-        winner_performers = [p for p in all_performers if p['team'] == winner_tricode][:3]
-        loser_performers = [p for p in all_performers if p['team'] == loser_tricode][:1]
+        # Use list comprehension with deduplication by player name
+        winner_perf_dict = {}
+        for p in all_performers:
+            if p['team'] == winner_tricode and p['name'] not in winner_perf_dict:
+                winner_perf_dict[p['name']] = p
+        winner_performers = sorted(winner_perf_dict.values(), key=lambda x: x.get('pts', 0), reverse=True)[:3]
         
-        # Sort by points to ensure we get the best
-        winner_performers = sorted(winner_performers, key=lambda x: x.get('pts', 0), reverse=True)[:3]
-        loser_performers = sorted(loser_performers, key=lambda x: x.get('pts', 0), reverse=True)[:1]
+        loser_perf_dict = {}
+        for p in all_performers:
+            if p['team'] == loser_tricode and p['name'] not in loser_perf_dict:
+                loser_perf_dict[p['name']] = p
+        loser_performers = sorted(loser_perf_dict.values(), key=lambda x: x.get('pts', 0), reverse=True)[:1]
         
         game_data = {
             "id": game.id,
@@ -208,24 +214,14 @@ def run(dry_run=False):
         if not games:
             logger.warning("⚠️ No games found for this date")
         
-        # Fetch top performers (with caching by date to avoid duplicate calls)
+        # Fetch top performers for each game
         logger.info("🔥 Fetching top performers...")
         all_top_performers = []
-        performers_cache = {}  # Cache by date to avoid duplicate API calls
         
         for game in games:
             try:
-                # Extract date from game object
-                game_date = datetime.fromisoformat(game.date.split('T')[0]).date() if 'T' in game.date else datetime.fromisoformat(game.date).date()
-                
-                # Check cache first
-                cache_key = str(game_date)
-                if cache_key not in performers_cache:
-                    performers = get_top_performers(game.id, target_date=game_date)
-                    performers_cache[cache_key] = performers
-                else:
-                    performers = performers_cache[cache_key]
-                
+                # Get top performers for THIS game
+                performers = get_top_performers(game.id, limit=5, target_date=game.date)
                 all_top_performers.extend(performers)
             except Exception as e:
                 logger.debug(f"⚠️ Error fetching performers for game {game.id}: {e}")

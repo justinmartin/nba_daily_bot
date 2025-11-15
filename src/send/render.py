@@ -299,8 +299,17 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                     <h2>👑 TOP 5 PERFORMERS OF THE NIGHT</h2>"""
     
     if top_performers:
-        # Get top 5 by points
-        sorted_performers = sorted(top_performers, key=lambda x: x.get('pts', 0), reverse=True)[:5]
+        # Deduplicate by player name and get top 5 by points
+        seen_names = set()
+        deduplicated = []
+        for p in top_performers:
+            player_name = p.get('name', 'Unknown')
+            if player_name not in seen_names:
+                seen_names.add(player_name)
+                deduplicated.append(p)
+        
+        # Sort by points and get top 5
+        sorted_performers = sorted(deduplicated, key=lambda x: x.get('pts', 0), reverse=True)[:5]
         
         html += """
                     <table>
