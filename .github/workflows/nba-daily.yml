@@ -2,10 +2,10 @@ name: 🏀 NBA Daily Newsletter
 
 on:
   schedule:
-    # Run every day at 7:30 AM UTC (adjust timezone as needed)
-    # For Europe/Paris (UTC+1 or UTC+2), this is 6:30 or 8:30 AM
-    # GitHub Actions uses UTC, so 07:30 UTC ≈ 8:30 AM Paris (summer) or 8:30 AM (winter adjusted)
-    - cron: '30 7 * * *'
+    # Run every day at 6:15 AM UTC
+    # This is 7:15 AM Paris time in winter (UTC+1)
+    # This is 8:15 AM Paris time in summer (UTC+2)
+    - cron: '15 6 * * *'
   
   # Allow manual trigger
   workflow_dispatch:
