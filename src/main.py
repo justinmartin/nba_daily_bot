@@ -19,6 +19,20 @@ logger = logging.getLogger(__name__)
 
 cfg = Config()
 
+# Team tricode to full name mapping
+TRICODE_TO_NAME = {
+    'ATL': 'Hawks', 'BOS': 'Celtics', 'CLE': 'Cavaliers', 'NOP': 'Pelicans',
+    'CHI': 'Bulls', 'DAL': 'Mavericks', 'MEM': 'Grizzlies', 'GSW': 'Warriors',
+    'HOU': 'Rockets', 'LAC': 'Clippers', 'LAL': 'Lakers', 'MIA': 'Heat',
+    'MIL': 'Bucks', 'MIN': 'Timberwolves', 'BRK': 'Nets', 'NYK': 'Knicks',
+    'ORL': 'Magic', 'PHI': '76ers', 'PHX': 'Suns', 'POR': 'Trail Blazers',
+    'SAC': 'Kings', 'SAS': 'Spurs', 'OKC': 'Thunder', 'TOR': 'Raptors',
+    'UTA': 'Jazz', 'WAS': 'Wizards'
+}
+
+# Full name to tricode mapping (reverse)
+NAME_TO_TRICODE = {v: k for k, v in TRICODE_TO_NAME.items()}
+
 def build_prompt(games, news, top_performers):
     """Build a detailed prompt that generates engaging, longer content."""
     
@@ -112,9 +126,13 @@ def organize_game_data(games, all_performers):
             winner_record = f"{game.away_wins}-{game.away_losses}" if (game.away_wins and game.away_losses) else "?"
             loser_record = f"{game.home_wins}-{game.home_losses}" if (game.home_wins and game.home_losses) else "?"
         
-        # Get top performers for this game (filter by team)
-        winner_performers = [p for p in all_performers if p['team'] == winner_name][:3]
-        loser_performers = [p for p in all_performers if p['team'] == loser_name][:1]
+        # Get team tricodes for matching with performers
+        winner_tricode = NAME_TO_TRICODE.get(winner_name, winner_name)
+        loser_tricode = NAME_TO_TRICODE.get(loser_name, loser_name)
+        
+        # Get top performers for this game (filter by team tricode)
+        winner_performers = [p for p in all_performers if p['team'] == winner_tricode][:3]
+        loser_performers = [p for p in all_performers if p['team'] == loser_tricode][:1]
         
         # Sort by points to ensure we get the best
         winner_performers = sorted(winner_performers, key=lambda x: x.get('pts', 0), reverse=True)[:3]
@@ -150,7 +168,8 @@ def format_performers_for_prompt(organized_games):
         if game['winner_top_performers']:
             performers_text += "  🏆 Winner's stars:\n"
             for p in game['winner_top_performers']:
-                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}"
+                team_display = TRICODE_TO_NAME.get(p.get('team'), p.get('team', 'N/A'))
+                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}%"
                 blk_stl = []
                 if p.get('blk'):
                     blk_stl.append(f"{p.get('blk')}blk")
@@ -158,12 +177,13 @@ def format_performers_for_prompt(organized_games):
                     blk_stl.append(f"{p.get('stl')}stl")
                 if blk_stl:
                     stats += f", {', '.join(blk_stl)}"
-                performers_text += f"    - {p['name']}: {stats}\n"
+                performers_text += f"    - {p['name']} ({team_display}): {stats}\n"
         
         if game['loser_top_performers']:
-            performers_text += "  Leading loser:\n"
+            performers_text += "  🔥 Leading loser:\n"
             for p in game['loser_top_performers']:
-                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}"
+                team_display = TRICODE_TO_NAME.get(p.get('team'), p.get('team', 'N/A'))
+                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}%"
                 blk_stl = []
                 if p.get('blk'):
                     blk_stl.append(f"{p.get('blk')}blk")
@@ -171,7 +191,7 @@ def format_performers_for_prompt(organized_games):
                     blk_stl.append(f"{p.get('stl')}stl")
                 if blk_stl:
                     stats += f", {', '.join(blk_stl)}"
-                performers_text += f"    - {p['name']}: {stats}\n"
+                performers_text += f"    - {p['name']} ({team_display}): {stats}\n"
     
     return performers_text
 

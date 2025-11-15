@@ -65,11 +65,16 @@ def get_games_by_date(d: date):
                 
                 try:
                     box_summary = BoxScoreSummaryV3(game_id=game_id)
-                    line_score = box_summary.get_data_frames()[1]
+                    # Dataframe 4 contains team stats with scores
+                    team_stats = box_summary.get_data_frames()[4]
                     
-                    if not line_score.empty and 'PTS' in line_score.columns:
-                        home_score = int(line_score.iloc[0]['PTS'])
-                        away_score = int(line_score.iloc[1]['PTS'])
+                    if not team_stats.empty and 'score' in team_stats.columns:
+                        # Find home and away scores
+                        for idx_ts, row_ts in team_stats.iterrows():
+                            if row_ts['teamId'] == home_team_id:
+                                home_score = int(row_ts['score'])
+                            elif row_ts['teamId'] == away_team_id:
+                                away_score = int(row_ts['score'])
                 except:
                     pass
                 
