@@ -230,18 +230,32 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
             
             # Add top performers for winner
             if game['winner_top_performers']:
-                html += "<div style='margin-top: 8px; font-size: 12px; color: #2d5016;'><strong>🏆 Winner's stars:</strong><br>"
+                html += "<div style='margin-top: 10px; font-size: 13px; color: #1a5f1a; background: #f0f8f0; padding: 8px; border-radius: 3px;'><strong>🏆 Winner's Top Performers:</strong><br>"
                 for p in game['winner_top_performers']:
-                    stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast"
-                    html += f"&nbsp;&nbsp;• {p['name']}: {stats}<br>"
+                    stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG: {p.get('fg_pct', 0):.0f}%"
+                    extras = []
+                    if p.get('blk'):
+                        extras.append(f"{p.get('blk')}blk")
+                    if p.get('stl'):
+                        extras.append(f"{p.get('stl')}stl")
+                    if extras:
+                        stats += f", {', '.join(extras)}"
+                    html += f"&nbsp;&nbsp;• <strong>{p['name']}</strong>: {stats}<br>"
                 html += "</div>"
             
             # Add best performer for loser
             if game['loser_top_performers']:
-                html += "<div style='margin-top: 4px; font-size: 12px; color: #666;'><strong>Leading loser:</strong><br>"
+                html += "<div style='margin-top: 8px; font-size: 13px; color: #663333; background: #f8f0f0; padding: 8px; border-radius: 3px;'><strong>🔥 Best from Losing Team:</strong><br>"
                 p = game['loser_top_performers'][0]
-                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast"
-                html += f"&nbsp;&nbsp;• {p['name']}: {stats}<br>"
+                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG: {p.get('fg_pct', 0):.0f}%"
+                extras = []
+                if p.get('blk'):
+                    extras.append(f"{p.get('blk')}blk")
+                if p.get('stl'):
+                    extras.append(f"{p.get('stl')}stl")
+                if extras:
+                    stats += f", {', '.join(extras)}"
+                html += f"&nbsp;&nbsp;• <strong>{p['name']}</strong>: {stats}<br>"
                 html += "</div>"
             
             html += """

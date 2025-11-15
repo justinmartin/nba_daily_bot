@@ -208,14 +208,24 @@ def run(dry_run=False):
         if not games:
             logger.warning("⚠️ No games found for this date")
         
-        # Fetch top performers
+        # Fetch top performers (with caching by date to avoid duplicate calls)
         logger.info("🔥 Fetching top performers...")
         all_top_performers = []
+        performers_cache = {}  # Cache by date to avoid duplicate API calls
+        
         for game in games:
             try:
                 # Extract date from game object
                 game_date = datetime.fromisoformat(game.date.split('T')[0]).date() if 'T' in game.date else datetime.fromisoformat(game.date).date()
-                performers = get_top_performers(game.id, target_date=game_date)
+                
+                # Check cache first
+                cache_key = str(game_date)
+                if cache_key not in performers_cache:
+                    performers = get_top_performers(game.id, target_date=game_date)
+                    performers_cache[cache_key] = performers
+                else:
+                    performers = performers_cache[cache_key]
+                
                 all_top_performers.extend(performers)
             except Exception as e:
                 logger.debug(f"⚠️ Error fetching performers for game {game.id}: {e}")

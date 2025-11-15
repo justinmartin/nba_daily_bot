@@ -46,8 +46,18 @@ def _get_from_stats_nba(limit=5, target_date=None):
                 game_id = str(game_row['GAME_ID']).zfill(10)
                 
                 # Get box score for this game (V3 is the new standard)
-                box_score = BoxScoreTraditionalV3(game_id=game_id)
-                player_stats = box_score.get_data_frames()[0]
+                # Use reduced timeout to fail faster and not block
+                try:
+                    box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=10)
+                    player_stats = box_score.get_data_frames()[0]
+                except:
+                    # If timeout, try once more with full timeout
+                    try:
+                        box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=20)
+                        player_stats = box_score.get_data_frames()[0]
+                    except Exception as e:
+                        logger.debug(f"⚠️ Skipping game {game_id} due to timeout: {type(e).__name__}")
+                        continue
                 
                 if player_stats.empty:
                     continue
