@@ -71,21 +71,21 @@ def get_games_by_date(d: date):
                     box_summary = BoxScoreSummaryV3(game_id=game_id)
                     data_frames = box_summary.get_data_frames()
                     
-                    # Dataframe 4 contains team stats with scores
+                    # Dataframe 4 contains team stats with scores and records
                     if len(data_frames) > 4:
                         team_stats = data_frames[4]
                         
-                        if not team_stats.empty and 'score' in team_stats.columns:
+                        if not team_stats.empty:
                             # Find home and away scores and records
                             for idx_ts, row_ts in team_stats.iterrows():
                                 if row_ts['teamId'] == home_team_id:
-                                    home_score = int(row_ts['score'])
-                                    home_wins = int(row_ts.get('wins', 0)) if 'wins' in row_ts else None
-                                    home_losses = int(row_ts.get('losses', 0)) if 'losses' in row_ts else None
+                                    home_score = int(row_ts.get('score', 0)) if row_ts.get('score') else 0
+                                    home_wins = int(row_ts.get('teamWins', 0)) if row_ts.get('teamWins') else None
+                                    home_losses = int(row_ts.get('teamLosses', 0)) if row_ts.get('teamLosses') else None
                                 elif row_ts['teamId'] == away_team_id:
-                                    away_score = int(row_ts['score'])
-                                    away_wins = int(row_ts.get('wins', 0)) if 'wins' in row_ts else None
-                                    away_losses = int(row_ts.get('losses', 0)) if 'losses' in row_ts else None
+                                    away_score = int(row_ts.get('score', 0)) if row_ts.get('score') else 0
+                                    away_wins = int(row_ts.get('teamWins', 0)) if row_ts.get('teamWins') else None
+                                    away_losses = int(row_ts.get('teamLosses', 0)) if row_ts.get('teamLosses') else None
                 except Exception as e:
                     logger.debug(f"Could not extract records for game {game_id}: {e}")
                 

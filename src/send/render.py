@@ -312,41 +312,44 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
         sorted_performers = sorted(deduplicated, key=lambda x: x.get('pts', 0), reverse=True)[:5]
         
         html += """
-                    <table>
+                    <table style="border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 13px;">
                         <thead>
-                            <tr>
-                                <th>Player</th>
-                                <th>Team</th>
-                                <th>PTS</th>
-                                <th>REB</th>
-                                <th>AST</th>
-                                <th>FG%</th>
-                                <th>3P%</th>
-                                <th>+/-</th>
-                                <th>BLK/STL</th>
+                            <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                <th style="padding: 12px 10px; text-align: left; font-weight: 600; border: none;">#</th>
+                                <th style="padding: 12px 10px; text-align: left; font-weight: 600; border: none;">PLAYER</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border: none;">PTS</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border: none;">REB</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border: none;">AST</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border: none;">FG%</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border: none;">3P%</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border: none;">BLK/STL</th>
                             </tr>
                         </thead>
                         <tbody>"""
         
-        for p in sorted_performers:
+        for rank, p in enumerate(sorted_performers, 1):
             blk_stl = []
-            if "blk" in p:
-                blk_stl.append(f"{p['blk']} BLK")
-            if "stl" in p:
-                blk_stl.append(f"{p['stl']} STL")
-            blk_stl_str = ", ".join(blk_stl) if blk_stl else "-"
+            if p.get('blk'):
+                blk_stl.append(f"{int(p['blk'])} BLK")
+            if p.get('stl'):
+                blk_stl.append(f"{int(p['stl'])} STL")
+            blk_stl_str = " / ".join(blk_stl) if blk_stl else "-"
+            
+            # Alternate row colors
+            row_bg = "#f9f9f9" if rank % 2 == 0 else "white"
+            pts = int(p.get('pts', 0))
+            rank_emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
             
             html += f"""
-                            <tr>
-                                <td>{p.get('name', 'Unknown')}</td>
-                                <td>{p.get('team', 'N/A')}</td>
-                                <td>{p.get('pts', 0)}</td>
-                                <td>{p.get('reb', 0)}</td>
-                                <td>{p.get('ast', 0)}</td>
-                                <td>{p.get('fg_pct', 'N/A')}</td>
-                                <td>{p.get('fg3_pct', 'N/A')}</td>
-                                <td>{p.get('+/-', '-')}</td>
-                                <td>{blk_stl_str}</td>
+                            <tr style="background: {row_bg}; border-bottom: 1px solid #e0e0e0;">
+                                <td style="padding: 12px 10px; font-weight: 700; color: #667eea;">{rank_emoji}</td>
+                                <td style="padding: 12px 10px;"><strong>{p.get('name', 'Unknown')}</strong><br><span style="font-size: 11px; color: #999;">{p.get('team', 'N/A')}</span></td>
+                                <td style="padding: 12px 10px; text-align: center; font-weight: 600; color: #667eea; font-size: 14px;">{pts}</td>
+                                <td style="padding: 12px 10px; text-align: center;">{int(p.get('reb', 0))}</td>
+                                <td style="padding: 12px 10px; text-align: center;">{int(p.get('ast', 0))}</td>
+                                <td style="padding: 12px 10px; text-align: center; color: #2d5016; font-weight: 600;">{p.get('fg_pct', 'N/A')}</td>
+                                <td style="padding: 12px 10px; text-align: center; color: #764ba2; font-weight: 600;">{p.get('fg3_pct', 'N/A')}</td>
+                                <td style="padding: 12px 10px; text-align: center; font-size: 12px;">{blk_stl_str}</td>
                             </tr>"""
         
         html += """
