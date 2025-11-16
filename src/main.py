@@ -37,7 +37,7 @@ def build_prompt(games, news, top_performers):
     """Build a detailed prompt that generates engaging, longer content."""
     
     if not games:
-        return "Write a funny NBA recap."
+        return "❌ No games played today."
     
     # Get the most dominant wins (top 3 for more detail)
     dominant = sorted(games, key=lambda g: abs(g.home_score - g.away_score), reverse=True)[:3]
@@ -54,7 +54,7 @@ def build_prompt(games, news, top_performers):
     wins_text = "\n".join(wins_desc)
     
     # Get top news headlines
-    news_headlines = "\n".join([f"• {n['title']}" for n in news[:3]]) if news else ""
+    news_headlines = "\n".join([f"• {n['title']}" for n in news[:5]]) if news else ""
     
     # Count close games vs blowouts
     close_games = sum(1 for g in games if abs(g.home_score - g.away_score) <= 5)
@@ -64,8 +64,28 @@ def build_prompt(games, news, top_performers):
     performers_section = format_performers_for_prompt(organize_game_data(games, top_performers))
     
     # Build a DETAILED prompt that generates longer, more comprehensive content
-    prompt = f"""You are a sports journalist writing for TRASHTALK MAGAZINE - a witty, sarcastic NBA news outlet.
+    prompt = f""" YOUR ASSIGNMENT:
+You are an NBA journalists, with a style like the French media 'Trashtalk''s journalists can do, write a 10 minutes newsletter summary.
+Please, and I insist, only use the information you are provided in the prompt, do not invent any data or facts no information is better than false information. Follow this rule and the following guidelines strictly:
+1. Highlights the biggest upsets and dominant performances, without creating sections/titles whatsoever, without formatting either, only paragraphs.
+2. Roasts the losing teams with little humor.
+3. Hypes up the star performances (the ones provided in the match details, only).
+4. Includes sarcastic commentary on the day's trends.
+5. References at multiple of today's headlines, by reading them carefully.
+6. Uses vivid, entertaining language, staying professional.
+7. NO generic sports clichés or boring phrases, no emojis whatsoever.
+8. Add detailed statistics and data from the games to support your points IF AND ONLY IF you have the data from the games and not old data. I'd rather have no data than false data.
+9. Bounce back on the Headlines and tendencies of the day and in the NBA.
+10. Reference the top performers data provided to add credibility and excitement to your coverage. Use real data from the games, not made-up figures or old ones. I'd rather have no data than false data.
+11. Do not introduce yourself or the newsletter at the beginning, go straight to the point.
+12. Do not write sections or format characters, my goal is to put the text directly in a newsletter that is sent automatically.
+13. Do not put titles or sections in the newsletter, and do not conclude with a sign-off.
 
+TONE: Profesional and Sharp, witty and serious, entertaining and factual, you love NBA drama, but you want to inform your readers first.
+STYLE: Mix facts with a bit of personality, be bold and opinionated, but stay professional before all.
+LENGTH: Make it substantial - give readers real insights with entertainment value
+
+DATA : 
 TONIGHT'S BIGGEST WINS:
 {wins_text}
 
@@ -78,26 +98,6 @@ GAME STATS:
 
 TODAY'S TOP HEADLINES:
 {news_headlines}
-
-YOUR ASSIGNMENT:
-You are an NBA journalists, with a style like the French media 'Trashtalk''s journalists can do, write a 10 minutes newsletter summary that:
-1. Highlights the biggest upsets and dominant performances, without creating sections/titles whatsoever, without formatting either, only paragraphs.
-2. Roasts the losing teams with little humor
-3. Hypes up the star performances (especially the ones provided in the match details)
-4. Includes sarcastic commentary on the day's trends
-5. References at multiple of today's headlines
-6. Uses vivid, entertaining language, staying professional
-7. NO generic sports clichés or boring phrases, no emojis whatsoever
-8. Add detailed statistics and data from the games to support your points IF AND ONLY IF you have the data from the games and not old data. I'd rather have no data than false data.
-Do not hesitate to bounce back on the Headlines and tendencies of the day and in the NBA
-Do not hesitate to reference the top performers data provided to add credibility and excitement to your coverage. Use real data from the games, not made-up figures or old ones. I'd rather have no data than false data.
-Do not introduce yourself or the newsletter at the beginning, go straight to the point.
-Do not write sections or format characters, my goal is to put the text directly in a newsletter that is sent automatically.
-Do not put titles or sections in the newsletter, and do not conclude with a sign-off.
-
-TONE: Profesional and Sharp, witty and serious, entertaining and factual, you love NBA drama, but you want to inform your readers first.
-STYLE: Mix facts with a bit of personality, be bold and opinionated, but stay professional before all.
-LENGTH: Make it substantial - give readers real insights with entertainment value
 
 NOW WRITE:"""
     
