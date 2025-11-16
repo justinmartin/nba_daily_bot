@@ -54,17 +54,8 @@ def build_prompt(games, news, top_performers):
     
     wins_text = "\n".join(wins_desc)
     
-    # Build news section with summaries if available
-    news_section = []
-    for n in news[:5]:
-        title = n.get('title', 'No title')
-        if 'summary' in n and n['summary']:
-            # Include article summary for context
-            news_section.append(f"• {title}\n  Context: {n['summary']}")
-        else:
-            news_section.append(f"• {title}")
-    
-    news_headlines = "\n\n".join(news_section) if news_section else ""
+    # Get top news headlines
+    news_headlines = "\n".join([f"• {n['title']}" for n in news[:5]]) if news else ""
     
     # Count close games vs blowouts
     close_games = sum(1 for g in games if abs(g.home_score - g.away_score) <= 5)
@@ -75,7 +66,7 @@ def build_prompt(games, news, top_performers):
     
     # Build a DETAILED prompt that generates longer, more comprehensive content
     prompt = f""" YOUR ASSIGNMENT:
-You are an NBA journalist, with a style like the French media 'Trashtalk''s journalists can do, write a 10 minutes newsletter summary.
+You are an NBA journalists, with a style like the French media 'Trashtalk''s journalists can do, write a 10 minutes newsletter summary.
 Please, and I insist, only use the information you are provided in the prompt, do not invent any data or facts no information is better than false information. Follow this rule and the following guidelines strictly:
 1. Highlights the biggest upsets and dominant performances, without creating sections/titles whatsoever, without formatting either, only paragraphs.
 2. Roasts the losing teams with little humor.
@@ -84,19 +75,18 @@ Please, and I insist, only use the information you are provided in the prompt, d
 5. References at multiple of today's headlines, by reading them carefully.
 6. Uses vivid, entertaining language, staying professional.
 7. NO generic sports clichés or boring phrases, no emojis whatsoever.
-8. CRITICAL: DO NOT copy-paste the statistics I give you in bullet points or formatted lists. The detailed stats will be shown in separate tables below your text. Instead, WEAVE the stats naturally into your narrative when relevant (e.g., "LeBron dominated with a near triple-double" instead of "LeBron James: 28pts, 7reb, 9ast").
+8. Add detailed statistics and data from the games to support your points IF AND ONLY IF you have the data from the games and not old data. I'd rather have no data than false data.
 9. Bounce back on the Headlines and tendencies of the day and in the NBA.
-10. Reference the top performers naturally in your storytelling, but don't list their stats in the same format I gave you.
+10. Reference the top performers data provided to add credibility and excitement to your coverage. Use real data from the games, not made-up figures or old ones. I'd rather have no data than false data.
 11. Do not introduce yourself or the newsletter at the beginning, go straight to the point.
 12. Do not write sections or format characters, my goal is to put the text directly in a newsletter that is sent automatically.
 13. Do not put titles or sections in the newsletter, and do not conclude with a sign-off.
-14. REMEMBER: Your job is to write an ENGAGING NARRATIVE SUMMARY. The raw stats tables are automatically added below - focus on analysis, context, and storytelling, not on reformatting the data I gave you.
 
-TONE: Professional and Sharp, witty and serious, entertaining and factual, you love NBA drama, but you want to inform your readers first.
-STYLE: Mix facts with a bit of personality, be bold and opinionated, but stay professional before all. Write stories, not stat sheets.
+TONE: Profesional and Sharp, witty and serious, entertaining and factual, you love NBA drama, but you want to inform your readers first.
+STYLE: Mix facts with a bit of personality, be bold and opinionated, but stay professional before all.
 LENGTH: Make it substantial - give readers real insights with entertainment value
 
-DATA (use for context, don't copy the format): 
+DATA : 
 TONIGHT'S BIGGEST WINS:
 {wins_text}
 
@@ -110,7 +100,7 @@ GAME STATS:
 TODAY'S TOP HEADLINES:
 {news_headlines}
 
-NOW WRITE YOUR NARRATIVE SUMMARY (remember: stats tables will appear below, so tell the STORY):"""
+NOW WRITE:"""
     
     return prompt
 
@@ -223,7 +213,9 @@ def run(dry_run=False):
         logger.info("📊 Fetching games...")
         games = get_games_by_date(target)
         if not games:
-            logger.warning("⚠️ No games found for this date")
+            logger.warning("⚠️ No games found for this date - skipping newsletter")
+            logger.info("✨ No newsletter to send today (no games played)")
+            return  # Exit early, no email sent
         
         # Fetch top performers for each game
         logger.info("🔥 Fetching top performers...")
