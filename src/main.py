@@ -8,6 +8,7 @@ import os
 from src.send.mailer import send_mail
 from src.fetch.players import get_top_performers
 from src.fetch.news import fetch_news
+from src.fetch.youtube import get_top_10_plays_video
 from src.send.render import render_email
 
 # Configure logging
@@ -230,6 +231,10 @@ def run(dry_run=False):
         logger.info("📰 Fetching news...")
         news = fetch_news(limit=5)
         
+        # Fetch Top 10 Plays video
+        logger.info("🎬 Fetching Top 10 Plays video...")
+        top_10_video = get_top_10_plays_video(target_date=target)
+        
         # Organize game data with performers
         logger.info("📊 Organizing game data with top performers...")
         organized_games = organize_game_data(games, all_top_performers)
@@ -245,7 +250,7 @@ def run(dry_run=False):
         
         # Render HTML
         logger.info("🎨 Rendering newsletter HTML...")
-        html = render_email(summary, news, all_top_performers, games, organized_games)
+        html = render_email(summary, news, all_top_performers, games, organized_games, top_10_video)
         
         # Save to file
         os.makedirs("out", exist_ok=True)

@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def render_email(summary_text, news, top_performers=None, games=None, organized_games=None):
+def render_email(summary_text, news, top_performers=None, games=None, organized_games=None, top_10_video=None):
     """Render newsletter HTML email."""
     
     if not summary_text or not summary_text.strip():
@@ -22,6 +22,9 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     
     if organized_games is None:
         organized_games = []
+    
+    if top_10_video is None:
+        top_10_video = None
     
     today = datetime.now().strftime("%A, %B %d %Y")
     summary_html = summary_text.replace("\n", "<br>")
@@ -360,6 +363,20 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                     <p><em>No detailed player stats available tonight.</em></p>"""
     
     html += """
+                </div>"""
+    
+    # Add Top 10 Plays section
+    if top_10_video:
+        html += f"""
+                
+                <div class="section">
+                    <div style="margin-top: 0; padding: 20px; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border-radius: 8px; text-align: center;">
+                        <h2 style="margin: 0 0 15px 0; color: white; font-size: 20px; border: none; padding: 0;">🎬 TOP 10 PLAYS OF THE NIGHT</h2>
+                        <a href="{top_10_video['url']}" style="display: inline-block; background: white; color: #ee5a6f; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 15px; margin-top: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            ▶️ Watch Highlights on YouTube
+                        </a>
+                        <p style="margin: 15px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.95); line-height: 1.5;">{top_10_video['title']}</p>
+                    </div>
                 </div>"""
     
     # Add news section
