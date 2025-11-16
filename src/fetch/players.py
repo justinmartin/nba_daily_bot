@@ -30,12 +30,12 @@ def _get_performers_for_game(game_id, limit=5):
         logger.debug(f"Fetching performers for game {game_id}...")
         
         try:
-            box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=10)
+            box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=30)
             player_stats = box_score.get_data_frames()[0]
         except:
             # If timeout, try once more with longer timeout
             try:
-                box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=20)
+                box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=60)
                 player_stats = box_score.get_data_frames()[0]
             except Exception as e:
                 logger.debug(f"⚠️ Failed to fetch performers for game {game_id}: {e}")
@@ -78,7 +78,7 @@ def _get_from_stats_nba(limit=5, target_date=None):
         logger.debug(f"Fetching performers from stats.nba.com for {date_str}...")
         
         # Get all games for the date
-        sb = ScoreboardV2(game_date=date_str)
+        sb = ScoreboardV2(game_date=date_str, timeout=60)
         games_df = sb.get_data_frames()[0]
         
         if games_df.empty:
@@ -95,12 +95,12 @@ def _get_from_stats_nba(limit=5, target_date=None):
                 # Get box score for this game (V3 is the new standard)
                 # Use reduced timeout to fail faster and not block
                 try:
-                    box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=10)
+                    box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=30)
                     player_stats = box_score.get_data_frames()[0]
                 except:
                     # If timeout, try once more with full timeout
                     try:
-                        box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=20)
+                        box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=60)
                         player_stats = box_score.get_data_frames()[0]
                     except Exception as e:
                         logger.debug(f"⚠️ Skipping game {game_id} due to timeout: {type(e).__name__}")

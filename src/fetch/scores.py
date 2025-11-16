@@ -36,13 +36,27 @@ def get_games_by_date(d: date):
     """Fetch NBA games for a given date using stats.nba.com (no API key needed)."""
     try:
         from nba_api.stats.endpoints import ScoreboardV2, BoxScoreSummaryV3
+        import time
         
         date_str = d.strftime('%Y-%m-%d')
         logger.debug(f"Fetching games for {date_str} from stats.nba.com...")
         
-        # Get scoreboard for the date
-        sb = ScoreboardV2(game_date=date_str)
-        games_df = sb.get_data_frames()[0]
+        # Get scoreboard for the date with retries
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                logger.debug(f"Attempt {attempt + 1}/{max_retries} to fetch scoreboard...")
+                sb = ScoreboardV2(game_date=date_str, timeout=60)  # Increased timeout to 60s
+                games_df = sb.get_data_frames()[0]
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 10  # 10s, 20s backoff
+                    logger.warning(f"⚠️ Attempt {attempt + 1} failed: {type(e).__name__}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"❌ All attempts failed to fetch scoreboard")
+                    raise
         
         if games_df.empty:
             logger.warning(f"⚠️ No games found for {date_str}")
@@ -68,7 +82,7 @@ def get_games_by_date(d: date):
                 away_losses = None
                 
                 try:
-                    box_summary = BoxScoreSummaryV3(game_id=game_id)
+                    box_summary = BoxScoreSummaryV3(game_id=game_id, timeout=60)
                     data_frames = box_summary.get_data_frames()
                     
                     # Dataframe 4 contains team stats with scores and records
