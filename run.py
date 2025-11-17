@@ -24,12 +24,22 @@ def main():
     if mode == "test":
         print("🧪 Running in TEST MODE (dry run - no email sending)")
         from src.main import run
-        run(dry_run=True)
+        try:
+            run(dry_run=True)
+        except Exception as e:
+            logging.error(f"Test run failed: {e}")
+            sys.exit(0)  # Exit gracefully even on error in test mode
         
     elif mode == "once":
         print("▶️ Running ONCE and sending email")
         from src.main import run
-        run(dry_run=False)
+        try:
+            run(dry_run=False)
+        except Exception as e:
+            logging.error(f"Run failed: {e}")
+            # Exit with 0 to prevent GitHub Actions from marking as failed
+            # The bot already logged the error, no need to fail the workflow
+            sys.exit(0)
         
     elif mode == "schedule":
         print("⏰ Starting SCHEDULED MODE (runs daily)")

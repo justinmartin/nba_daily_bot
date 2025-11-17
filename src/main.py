@@ -209,9 +209,15 @@ def run(dry_run=False):
         target = (datetime.now() - timedelta(days=1)).date()
         logger.info(f"🚀 Starting NBA Daily Bot for {target}")
         
-        # Fetch games
+        # Fetch games with error handling
         logger.info("📊 Fetching games...")
-        games = get_games_by_date(target)
+        try:
+            games = get_games_by_date(target)
+        except Exception as e:
+            logger.error(f"❌ Failed to fetch games due to API timeout/error: {e}")
+            logger.warning("⚠️ Skipping newsletter - stats.nba.com is unavailable")
+            return  # Exit gracefully, no email sent
+        
         if not games:
             logger.warning("⚠️ No games found for this date - skipping newsletter")
             logger.info("✨ No newsletter to send today (no games played)")
