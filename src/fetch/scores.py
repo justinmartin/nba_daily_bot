@@ -42,16 +42,16 @@ def get_games_by_date(d: date):
         logger.debug(f"Fetching games for {date_str} from stats.nba.com...")
         
         # Get scoreboard for the date with retries
-        max_retries = 3
+        max_retries = 5  # Increased from 3 to 5
         for attempt in range(max_retries):
             try:
                 logger.debug(f"Attempt {attempt + 1}/{max_retries} to fetch scoreboard...")
-                sb = ScoreboardV2(game_date=date_str, timeout=60)  # Increased timeout to 60s
+                sb = ScoreboardV2(game_date=date_str, timeout=120)  # Increased timeout to 120s (was 60s)
                 games_df = sb.get_data_frames()[0]
                 break
             except Exception as e:
                 if attempt < max_retries - 1:
-                    wait_time = (attempt + 1) * 10  # 10s, 20s backoff
+                    wait_time = (attempt + 1) * 15  # 15s, 30s, 45s, 60s backoff
                     logger.warning(f"⚠️ Attempt {attempt + 1} failed: {type(e).__name__}. Retrying in {wait_time}s...")
                     time.sleep(wait_time)
                 else:
@@ -82,7 +82,7 @@ def get_games_by_date(d: date):
                 away_losses = None
                 
                 try:
-                    box_summary = BoxScoreSummaryV3(game_id=game_id, timeout=60)
+                    box_summary = BoxScoreSummaryV3(game_id=game_id, timeout=120)  # Increased timeout to 120s
                     data_frames = box_summary.get_data_frames()
                     
                     # Dataframe 4 contains team stats with scores and records
