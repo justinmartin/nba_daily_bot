@@ -2,10 +2,10 @@ name: 🏀 NBA Daily Newsletter
 
 on:
   schedule:
-    # Run every day at 10:00 AM UTC
-    # This is 11:00 AM Paris time in winter (UTC+1)
-    # This is 12:00 PM Paris time in summer (UTC+2)
-    - cron: '0 10 * * *'
+    # Run every day at 10:30 AM UTC
+    # This is 11:30 AM Paris time in winter (UTC+1)
+    # This is 12:30 PM Paris time in summer (UTC+2)
+    - cron: '30 10 * * *'
   
   # Allow manual trigger
   workflow_dispatch:
