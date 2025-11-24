@@ -1,3 +1,18 @@
+"""
+Module de rendu HTML pour la newsletter NBA Daily.
+
+Ce module génère le code HTML complet de l'email newsletter avec:
+    - En-tête stylisé avec dégradé violet (couleurs NBA)
+    - Résumé généré par l'IA
+    - Résultats des matchs avec top performers
+    - Tableau des 5 meilleurs joueurs de la soirée
+    - Section vidéo Top 10 Plays YouTube
+    - Actualités ESPN avec liens
+    - Footer automatique
+
+Le HTML généré est compatible avec les clients email (inline CSS, pas de JS).
+"""
+
 from datetime import datetime
 import logging
 
@@ -5,12 +20,41 @@ logger = logging.getLogger(__name__)
 
 
 def render_email(summary_text, news, top_performers=None, games=None, organized_games=None, top_10_video=None):
-    """Render newsletter HTML email."""
+    """
+    Génère le HTML complet de la newsletter NBA Daily.
     
+    Args:
+        summary_text (str): Texte généré par l'IA (résumé de la soirée)
+        news (list[dict]): Actualités ESPN [{title, link, published}, ...]
+        top_performers (list[dict], optional): Stats des meilleurs joueurs
+        games (list[Game], optional): Liste des matchs (fallback si organized_games absent)
+        organized_games (list[dict], optional): Matchs organisés avec performers
+        top_10_video (dict, optional): Infos vidéo YouTube {title, url, thumbnail, ...}
+    
+    Returns:
+        str: Code HTML complet prêt à être envoyé par email
+    
+    Structure du HTML:
+        1. Header (titre + date)
+        2. Summary (texte généré par l'IA)
+        3. Game Results (scores + top performers par match)
+        4. Top 5 Performers (tableau global)
+        5. Top 10 Plays (vidéo YouTube si disponible)
+        6. Latest News (actualités ESPN)
+        7. Footer (mention bot automatique)
+    
+    Style:
+        - Dégradé violet/mauve (#667eea → #764ba2)
+        - Responsive (adapté mobile et desktop)
+        - Inline CSS (requis pour compatibilité email)
+        - Emojis pour améliorer la lisibilité
+    """
+    # === ÉTAPE 1: Valider et initialiser les paramètres ===
     if not summary_text or not summary_text.strip():
         logger.warning("Summary text is empty")
         summary_text = "No summary available"
     
+    # Valeurs par défaut pour les paramètres optionnels
     if news is None:
         news = []
     
@@ -26,8 +70,13 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     if top_10_video is None:
         top_10_video = None
     
+    # === ÉTAPE 2: Préparer les données pour le template ===
+    # Date actuelle formatée (ex: "Monday, November 24 2025")
     today = datetime.now().strftime("%A, %B %d %Y")
+    # Convertit les retours à la ligne en <br> pour le HTML
     summary_html = summary_text.replace("\n", "<br>")
+    
+    # === ÉTAPE 3: Construire le HTML (header + styles) ===
     
     html = """<!DOCTYPE html>
     <html>

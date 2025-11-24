@@ -139,37 +139,3 @@ def get_top_10_plays_video(target_date=None):
         # On log l'erreur mais on continue (pas critique)
         logger.error(f"❌ Failed to fetch Top 10 Plays video: {e}")
         return None
-
-
-def format_top_10_section(video_info):
-    """
-    Génère le HTML de la section "Top 10 Plays" pour la newsletter.
-    
-    Args:
-        video_info (dict): Infos de la vidéo (title, url, thumbnail, etc.)
-                          ou None si aucune vidéo trouvée
-    
-    Returns:
-        str: HTML formaté avec bouton de lecture
-             Chaîne vide si video_info est None
-    
-    Style:
-        - Fond dégradé rouge (couleurs NBA)
-        - Bouton blanc avec lien YouTube
-        - Titre de la vidéo en petit sous le bouton
-    """
-    if not video_info:
-        return ""  # Pas de vidéo = pas de section
-    
-    # HTML avec inline styles (compatible email)
-    html = f"""
-    <div style="margin-top: 15px; padding: 15px; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border-radius: 8px; text-align: center;">
-        <h3 style="margin: 0 0 10px 0; color: white; font-size: 16px;">🎬 TOP 10 PLAYS OF THE NIGHT</h3>
-        <a href="{video_info['url']}" style="display: inline-block; background: white; color: #ee5a6f; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 8px;">
-            ▶️ Watch Highlights
-        </a>
-        <p style="margin: 10px 0 0 0; font-size: 12px; color: rgba(255,255,255,0.9);">{video_info['title']}</p>
-    </div>
-    """
-    
-    return html
