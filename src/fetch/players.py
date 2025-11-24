@@ -1,3 +1,10 @@
+"""
+NBA Top Performers Fetcher.
+
+Ce module récupère les meilleurs performeurs (joueurs) NBA pour une date donnée
+ou pour un match spécifique, en utilisant l'API stats.nba.com via nba_api.
+"""
+
 import logging
 from datetime import date
 import pandas as pd
@@ -7,13 +14,33 @@ logger = logging.getLogger(__name__)
 
 def get_top_performers(game_id, limit=5, target_date=None):
     """
-    Get top performers using stats.nba.com (single source).
-    If game_id provided and not empty, get performers from that game.
-    If game_id empty, get top performers globally for the date.
+    Récupère les meilleurs performeurs NBA (joueurs avec le plus de points).
+    
+    Deux modes de fonctionnement:
+    - Si game_id fourni: Top performers pour CE match uniquement
+    - Si game_id vide/None: Top performers globaux pour tous les matchs du jour
+    
+    Args:
+        game_id (str): ID du match spécifique (ex: "0022500145")
+                       Peut être None ou "" pour mode global
+        limit (int): Nombre de performeurs à retourner (défaut: 5)
+        target_date (date, optional): Date cible (défaut: aujourd'hui)
+    
+    Returns:
+        list[dict]: Liste des performeurs avec stats (pts, reb, ast, etc.)
+                    Triés par points décroissants
+    
+    Exemple de retour:
+        [
+          {'name': 'LeBron James', 'team': 'LAL', 'pts': 40, 'reb': 10, 'ast': 8, ...},
+          {'name': 'Stephen Curry', 'team': 'GSW', 'pts': 35, 'reb': 5, 'ast': 12, ...},
+          ...
+        ]
     """
     if target_date is None:
         target_date = date.today()
     
+    # Router vers la bonne fonction selon le mode
     if game_id and game_id != "":
         return _get_performers_for_game(game_id, limit)
     else:
@@ -22,7 +49,24 @@ def get_top_performers(game_id, limit=5, target_date=None):
 
 def _get_performers_for_game(game_id, limit=5):
     """
-    Get top performers for a specific game.
+    Récupère les top performers pour UN match spécifique.
+    
+    Processus:
+    1. Appelle BoxScoreTraditionalV3 pour avoir les stats de tous les joueurs
+    2. Parse chaque joueur et extrait ses stats
+    3. Tri par points décroissants
+    4. Retourne les N meilleurs
+    
+    Args:
+        game_id (str): ID du match (ex: "0022500145")
+        limit (int): Nombre de joueurs à retourner
+    
+    Returns:
+        list[dict]: Top performers du match
+    
+    Gestion des erreurs:
+        - Timeout 30s puis retry avec 60s si échec
+        - Si échec complet: retourne [] (pas de crash)
     """
     try:
         from nba_api.stats.endpoints import BoxScoreTraditionalV3
