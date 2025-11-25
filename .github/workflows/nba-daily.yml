@@ -54,6 +54,7 @@ jobs:
           name: newsletter
           path: out/
           retention-days: 30
+          if-no-files-found: ignore  # Ne pas échouer si aucun fichier (ex: pas de matchs)
       
       - name: 📊 Show logs
         if: failure()
