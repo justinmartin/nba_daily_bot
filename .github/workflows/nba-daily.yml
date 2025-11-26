@@ -14,7 +14,7 @@ on:
 jobs:
   nba-newsletter:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # Increased to 30 minutes to handle slow NBA API
+    timeout-minutes: 45  # Increased to 45 min (5 retries × 60s timeout + processing time)
     
     steps:
       - name: 📥 Checkout repository

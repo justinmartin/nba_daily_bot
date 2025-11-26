@@ -73,12 +73,13 @@ def get_games_by_date(d: date):
                     Liste vide si aucun match ou erreur
     
     Gestion des erreurs:
-        - Retry jusqu'à 3 fois avec 5s d'attente entre tentatives
-        - Timeout de 30s par requête (évite blocage)
+        - Retry jusqu'à 5 fois avec 10s d'attente entre tentatives
+        - Timeout de 60s par requête (l'API NBA peut être TRÈS lente)
         - Si API indisponible: retourne [] (pas de crash)
     
     Note:
-        L'API stats.nba.com est GRATUITE mais parfois LENTE (30s+ par requête)
+        L'API stats.nba.com est GRATUITE mais parfois LENTE (60s+ par requête)
+        En cas de timeout répété, l'API est probablement surchargée.
     """
     try:
         # Import dynamique (évite erreur si nba_api pas installé)
@@ -89,21 +90,21 @@ def get_games_by_date(d: date):
         logger.debug(f"Fetching games for {date_str} from stats.nba.com...")
         
         # === ÉTAPE 1: Récupère le scoreboard (liste des matchs) avec retry ===
-        max_retries = 3  # 3 tentatives maximum
+        max_retries = 5  # 5 tentatives (l'API NBA peut être instable)
         for attempt in range(max_retries):
             try:
                 logger.debug(f"Attempt {attempt + 1}/{max_retries} to fetch scoreboard...")
                 
                 # ScoreboardV2 = endpoint NBA API qui retourne tous les matchs du jour
-                # timeout=30s pour éviter blocage si API lente
-                sb = ScoreboardV2(game_date=date_str, timeout=30)
+                # timeout=60s car l'API peut être TRÈS lente (parfois 45s+)
+                sb = ScoreboardV2(game_date=date_str, timeout=60)
                 games_df = sb.get_data_frames()[0]  # DataFrame pandas avec les matchs
                 break  # Succès, sort de la boucle retry
                 
             except Exception as e:
                 if attempt < max_retries - 1:
                     # Encore des tentatives restantes
-                    wait_time = 5  # Attend 5s avant de réessayer
+                    wait_time = 10  # Attend 10s avant de réessayer (donne à l'API le temps de récupérer)
                     logger.warning(f"⚠️ Attempt {attempt + 1} failed: {type(e).__name__}. Retrying in {wait_time}s...")
                     time.sleep(wait_time)
                 else:
