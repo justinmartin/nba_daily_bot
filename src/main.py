@@ -361,9 +361,14 @@ def run(dry_run=False):
         - Tolérant aux erreurs (continue même si YouTube/news fail)
     """
     try:
-        # === ÉTAPE 1: Calculer la date cible ===
-        # Les matchs NBA se jouent le soir (18h-23h)
-        # On récupère donc les matchs de la VEILLE pour la newsletter du matin
+        # === ÉTAPE 1: Calculer la date cible (logique timezone NBA) ===
+        # Les matchs NBA se jouent entre 19h-2h US Eastern Time (1h-8h du matin Paris)
+        # Le bot tourne à 8h du matin Paris → les matchs de la nuit sont terminés
+        # 
+        # Logique simple: toujours prendre les matchs d'HIER
+        # Car à 8h du matin, les matchs de "hier soir" (qui se sont joués cette nuit)
+        # sont tous terminés et disponibles dans l'API NBA
+        
         target = (datetime.now() - timedelta(days=1)).date()
         logger.info(f"🚀 Starting NBA Daily Bot for {target}")
         
