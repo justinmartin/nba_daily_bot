@@ -35,10 +35,17 @@ def main():
         from src.main import run
         try:
             run(dry_run=False)
+            print("✅ Newsletter sent successfully!")
         except Exception as e:
-            logging.error(f"Run failed: {e}")
+            logging.error(f"❌ Run failed: {e}", exc_info=True)
             # Exit with 0 to prevent GitHub Actions from marking as failed
-            # The bot already logged the error, no need to fail the workflow
+            # But log the full error for debugging
+            print(f"\n{'='*60}")
+            print(f"ERROR DETAILS:")
+            print(f"{'='*60}")
+            import traceback
+            traceback.print_exc()
+            print(f"{'='*60}\n")
             sys.exit(0)
         
     elif mode == "schedule":
