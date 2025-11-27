@@ -135,8 +135,7 @@ Please, and I insist, only use the information you are provided in the prompt, d
 
 TONE: Profesional and Sharp, witty and serious, entertaining and factual, you love NBA drama, but you want to inform your readers first.
 STYLE: Mix facts with a bit of personality, be bold and opinionated, but stay professional before all.
-LENGTH: Make it substantial - give readers real insights with entertainment value. Develop a bit on the key games and players of the night based on the data provided, but no hallucination.
-
+LENGTH: Make it substantial - give readers real insights with entertainment value.
 DATA : 
 TONIGHT'S BIGGEST WINS:
 {wins_text}
