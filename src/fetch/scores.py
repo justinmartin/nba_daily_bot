@@ -197,6 +197,22 @@ def get_games_by_date(d: date):
         raise
         
     except Exception as e:
-        # Erreur globale (réseau, API down, etc.)
+        # === FALLBACK: Essayer ESPN API si NBA API échoue ===
         logger.error(f"❌ Failed to fetch games for {d}: {e}")
-        raise
+        logger.warning("⚠️ Trying ESPN API as fallback...")
+        
+        try:
+            from src.fetch.scores_fallback import get_games_from_espn
+            games = get_games_from_espn(d)
+            
+            if games:
+                logger.info(f"✅ Fallback successful! Got {len(games)} games from ESPN")
+                return games
+            else:
+                logger.error("❌ Fallback ESPN API also returned no games")
+                raise Exception("Both NBA API and ESPN fallback failed")
+                
+        except Exception as fallback_error:
+            logger.error(f"❌ Fallback ESPN API also failed: {fallback_error}")
+            raise
+
