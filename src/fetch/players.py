@@ -111,6 +111,8 @@ def _get_from_stats_nba(limit=5, target_date=None):
     """
     Fetch top performers from stats.nba.com for a given date.
     Uses nba-api with no authentication needed.
+    
+    FALLBACK: Si stats.nba.com timeout/bloqué → bascule automatiquement sur ESPN API
     """
     try:
         from nba_api.stats.endpoints import ScoreboardV2, BoxScoreTraditionalV3
@@ -182,8 +184,22 @@ def _get_from_stats_nba(limit=5, target_date=None):
         logger.error(f"❌ Import error (nba-api or pandas not installed): {e}")
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to fetch performers from stats.nba.com: {e}")
-        raise
+        logger.warning(f"⚠️ NBA API failed for player stats: {type(e).__name__}")
+        logger.info("🔄 Trying ESPN API as fallback for player stats...")
+        
+        # FALLBACK: Basculer sur ESPN API
+        try:
+            from .players_fallback import get_top_performers_from_espn
+            performers = get_top_performers_from_espn(target_date=target_date, limit=limit)
+            if performers:
+                logger.info(f"✅ ESPN API fallback succeeded: {len(performers)} performers")
+                return performers
+            else:
+                logger.error("❌ ESPN API fallback returned no performers")
+                raise Exception("Both NBA API and ESPN API failed")
+        except Exception as fallback_error:
+            logger.error(f"❌ ESPN API fallback also failed: {fallback_error}")
+            raise
 
 
 def _parse_player_stats(player_row, game_row):
