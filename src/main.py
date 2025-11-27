@@ -398,16 +398,16 @@ def run(dry_run=False):
         from datetime import datetime as dt
         game_date_obj = dt.strptime(games[0].date, '%Y-%m-%d').date() if games else target
         
-        for game in games:
-            try:
-                # get_top_performers retourne les 5 meilleurs joueurs du match
-                # On utilise game_date_obj (objet date) au lieu de game.date (string)
-                performers = get_top_performers(game.id, limit=5, target_date=game_date_obj)
-                all_top_performers.extend(performers)
-            except Exception as e:
-                # Si un match échoue, on continue avec les autres
-                # (pas critique, on peut générer la newsletter sans les stats détaillées)
-                logger.debug(f"⚠️ Error fetching performers for game {game.id}: {e}")
+        # IMPORTANT: On appelle get_top_performers SANS game_id (game_id='')
+        # pour utiliser le mode global qui a le fallback ESPN API.
+        # Le mode per-game (avec game_id) n'a pas de fallback et échoue sur GitHub Actions.
+        try:
+            logger.info(f"Fetching all top performers for {game_date_obj}...")
+            all_top_performers = get_top_performers('', limit=50, target_date=game_date_obj)
+            logger.info(f"✅ Found {len(all_top_performers)} total performers")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to fetch top performers: {e}")
+            all_top_performers = []
         
         # === ÉTAPE 5: Récupérer les actualités ESPN ===
         logger.info("📰 Fetching news...")

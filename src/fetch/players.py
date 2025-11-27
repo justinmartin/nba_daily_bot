@@ -1,252 +1,259 @@
 """
-NBA Top Performers Fetcher.
+NBA Top Performers Fetcher via ESPN API.
 
-Ce module récupère les meilleurs performeurs (joueurs) NBA pour une date donnée
-ou pour un match spécifique, en utilisant l'API stats.nba.com via nba_api.
+Ce module récupère les meilleurs performeurs (joueurs) NBA en utilisant l'API ESPN.
+ESPN API est gratuite, rapide et fonctionne sur GitHub Actions (contrairement à stats.nba.com).
 """
 
 import logging
+import requests
 from datetime import date
-import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+# Timeout rapide car ESPN API est beaucoup plus rapide que stats.nba.com
+TIMEOUT = 15
 
 
 def get_top_performers(game_id, limit=5, target_date=None):
     """
-    Récupère les meilleurs performeurs NBA (joueurs avec le plus de points).
+    Récupère les meilleurs performeurs NBA via ESPN API.
     
-    Deux modes de fonctionnement:
-    - Si game_id fourni: Top performers pour CE match uniquement
-    - Si game_id vide/None: Top performers globaux pour tous les matchs du jour
+    Avantages ESPN API:
+    - Rapide (15s timeout vs 60s NBA API)
+    - Pas bloqué par les IPs cloud (GitHub Actions)
+    - Pas besoin de clé API
+    - Données officielles ESPN
     
     Args:
-        game_id (str): ID du match spécifique (ex: "0022500145")
-                       Peut être None ou "" pour mode global
+        game_id (str): Ignoré (gardé pour compatibilité avec l'ancien code)
         limit (int): Nombre de performeurs à retourner (défaut: 5)
-        target_date (date, optional): Date cible (défaut: aujourd'hui)
+        target_date (date, optional): Date des matchs (défaut: aujourd'hui)
     
     Returns:
-        list[dict]: Liste des performeurs avec stats (pts, reb, ast, etc.)
-                    Triés par points décroissants
+        list[dict]: Top performers avec stats (pts, reb, ast, etc.)
+                    Format identique à l'ancien code pour compatibilité
     
-    Exemple de retour:
+    Exemple:
         [
-          {'name': 'LeBron James', 'team': 'LAL', 'pts': 40, 'reb': 10, 'ast': 8, ...},
-          {'name': 'Stephen Curry', 'team': 'GSW', 'pts': 35, 'reb': 5, 'ast': 12, ...},
-          ...
+          {'name': 'LeBron James', 'team': 'LAL', 'pts': 40, 'reb': 10, ...},
+          {'name': 'Stephen Curry', 'team': 'GSW', 'pts': 35, 'reb': 5, ...}
         ]
     """
     if target_date is None:
         target_date = date.today()
     
-    # Router vers la bonne fonction selon le mode
-    if game_id and game_id != "":
-        return _get_performers_for_game(game_id, limit)
-    else:
-        return _get_from_stats_nba(limit, target_date)
-
-
-def _get_performers_for_game(game_id, limit=5):
-    """
-    Récupère les top performers pour UN match spécifique.
+    date_str = target_date.strftime('%Y%m%d')
     
-    Processus:
-    1. Appelle BoxScoreTraditionalV3 pour avoir les stats de tous les joueurs
-    2. Parse chaque joueur et extrait ses stats
-    3. Tri par points décroissants
-    4. Retourne les N meilleurs
-    
-    Args:
-        game_id (str): ID du match (ex: "0022500145")
-        limit (int): Nombre de joueurs à retourner
-    
-    Returns:
-        list[dict]: Top performers du match
-    
-    Gestion des erreurs:
-        - Timeout 30s puis retry avec 60s si échec
-        - Si échec complet: retourne [] (pas de crash)
-    """
     try:
-        from nba_api.stats.endpoints import BoxScoreTraditionalV3
+        logger.info(f"🏀 Fetching player stats from ESPN API for {target_date}...")
         
-        logger.debug(f"Fetching performers for game {game_id}...")
+        # ESPN Scoreboard API endpoint
+        url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+        params = {"dates": date_str}
         
-        try:
-            box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=30)
-            player_stats = box_score.get_data_frames()[0]
-        except:
-            # If timeout, try once more with longer timeout
-            try:
-                box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=60)
-                player_stats = box_score.get_data_frames()[0]
-            except Exception as e:
-                logger.debug(f"⚠️ Failed to fetch performers for game {game_id}: {e}")
-                return []
+        response = requests.get(url, params=params, timeout=TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
         
-        if player_stats.empty:
+        games = data.get("events", [])
+        
+        if not games:
+            logger.warning(f"⚠️ No games found on ESPN for {target_date}")
             return []
         
         all_performers = []
         
-        # Parse each player's stats
-        for p_idx, player_row in player_stats.iterrows():
-            performer = _parse_player_stats(player_row, None)
-            if performer and performer.get('pts', 0) > 0:  # Only include players who scored
-                all_performers.append(performer)
+        # Parcourir tous les matchs et extraire les stats des joueurs
+        for game in games:
+            try:
+                performers = _extract_performers_from_game(game)
+                all_performers.extend(performers)
+            except Exception as e:
+                logger.debug(f"⚠️ Error processing game: {e}")
+                continue
         
-        # Sort by points and return top N
-        all_performers.sort(key=lambda x: float(x.get('pts', 0)), reverse=True)
+        # Trier par points décroissants et prendre les top N
+        all_performers.sort(key=lambda x: x.get('pts', 0), reverse=True)
         top_performers = all_performers[:limit]
         
+        logger.info(f"✅ ESPN API: Found {len(top_performers)} top performers")
         return top_performers
         
+    except requests.exceptions.Timeout:
+        logger.error(f"❌ ESPN API timeout after {TIMEOUT}s")
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ ESPN API request failed: {e}")
+        return []
     except Exception as e:
-        logger.debug(f"⚠️ Error fetching performers for game {game_id}: {e}")
+        logger.error(f"❌ ESPN API error: {e}")
         return []
 
 
-def _get_from_stats_nba(limit=5, target_date=None):
+def _extract_performers_from_game(game):
     """
-    Fetch top performers from stats.nba.com for a given date.
-    Uses nba-api with no authentication needed.
+    Extrait les stats des joueurs d'un match ESPN.
     
-    FALLBACK: Si stats.nba.com timeout/bloqué → bascule automatiquement sur ESPN API
+    ESPN fournit les "leaders" (meilleurs joueurs) de chaque équipe pour le match.
+    On récupère les joueurs des deux équipes et leurs stats.
+    
+    Args:
+        game (dict): Données JSON du match depuis ESPN API
+    
+    Returns:
+        list[dict]: Liste des performeurs du match
     """
+    performers = []
+    
     try:
-        from nba_api.stats.endpoints import ScoreboardV2, BoxScoreTraditionalV3
-        
-        if target_date is None:
-            target_date = date.today()
-        
-        date_str = target_date.strftime('%Y-%m-%d')
-        logger.debug(f"Fetching performers from stats.nba.com for {date_str}...")
-        
-        # Get all games for the date
-        sb = ScoreboardV2(game_date=date_str, timeout=60)
-        games_df = sb.get_data_frames()[0]
-        
-        if games_df.empty:
-            logger.warning(f"⚠️ No games found for {date_str}")
+        competitions = game.get("competitions", [])
+        if not competitions:
             return []
         
-        all_performers = []
+        competition = competitions[0]
+        competitors = competition.get("competitors", [])
         
-        # Iterate through each game and collect player stats
-        for idx, game_row in games_df.iterrows():
+        # Pour chaque équipe (home/away)
+        for competitor in competitors:
+            team_abbr = competitor.get("team", {}).get("abbreviation", "UNK")
+            
+            # ESPN fournit les "leaders" (meilleurs stats du match)
+            leaders = competitor.get("leaders", [])
+            
+            # Extraire les stats des leaders de cette équipe
+            team_performers = _parse_team_leaders(leaders, team_abbr)
+            performers.extend(team_performers)
+        
+        return performers
+        
+    except Exception as e:
+        logger.debug(f"⚠️ Error extracting performers from game: {e}")
+        return []
+
+
+def _parse_team_leaders(leaders, team_abbr):
+    """
+    Parse les "leaders" (meilleurs joueurs) d'une équipe depuis ESPN.
+    
+    ESPN fournit les leaders pour différentes catégories:
+    - points: Meilleur marqueur
+    - rebounds: Meilleur rebondeur
+    - assists: Meilleur passeur
+    
+    On extrait le leader en points car c'est le plus pertinent pour top performers.
+    
+    Args:
+        leaders (list): Liste des leaders depuis ESPN API
+        team_abbr (str): Abréviation de l'équipe (ex: "LAL")
+    
+    Returns:
+        list[dict]: Liste des performeurs de cette équipe
+    """
+    performers = []
+    
+    try:
+        # Trouver le leader en points
+        points_leader = None
+        for leader_cat in leaders:
+            if leader_cat.get("name") == "points":
+                points_leader = leader_cat
+                break
+        
+        if not points_leader:
+            return []
+        
+        # ESPN peut avoir plusieurs joueurs ex-aequo
+        athletes = points_leader.get("leaders", [])
+        
+        for athlete in athletes:
             try:
-                game_id = str(game_row['GAME_ID']).zfill(10)
-                
-                # Get box score for this game (V3 is the new standard)
-                # Use reduced timeout to fail faster and not block
-                try:
-                    box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=30)
-                    player_stats = box_score.get_data_frames()[0]
-                except:
-                    # If timeout, try once more with full timeout
-                    try:
-                        box_score = BoxScoreTraditionalV3(game_id=game_id, timeout=60)
-                        player_stats = box_score.get_data_frames()[0]
-                    except Exception as e:
-                        logger.debug(f"⚠️ Skipping game {game_id} due to timeout: {type(e).__name__}")
-                        continue
-                
-                if player_stats.empty:
-                    continue
-                
-                # Parse each player's stats
-                for p_idx, player_row in player_stats.iterrows():
-                    # Skip if no player name (V3 uses firstName and familyName)
-                    first_name = player_row.get('firstName', '')
-                    family_name = player_row.get('familyName', '')
-                    
-                    if pd.isna(first_name) or pd.isna(family_name):
-                        if not first_name and not family_name:
-                            continue
-                    
-                    performer = _parse_player_stats(player_row, game_row)
-                    if performer:
-                        all_performers.append(performer)
-                        
+                performer = _parse_athlete_stats(athlete, team_abbr, leaders)
+                if performer:
+                    performers.append(performer)
             except Exception as e:
-                logger.debug(f"⚠️ Error processing game {game_id}: {e}")
+                logger.debug(f"⚠️ Error parsing athlete: {e}")
                 continue
         
-        # Sort by points (descending) and return top N
-        all_performers.sort(key=lambda x: float(x.get('pts', 0)), reverse=True)
-        top_performers = all_performers[:limit]
+        return performers
         
-        logger.info(f"✅ Found {len(top_performers)} top performers for {date_str}")
-        return top_performers
-        
-    except (ImportError, Exception) as e:
-        # Intercepter TOUTES les erreurs (import, timeout, etc.) et utiliser le fallback
-        logger.warning(f"⚠️ NBA API failed for player stats: {type(e).__name__}: {e}")
-        logger.info("🔄 Trying ESPN API as fallback for player stats...")
-        
-        # FALLBACK: Basculer sur ESPN API
-        try:
-            from .players_fallback import get_top_performers_from_espn
-            performers = get_top_performers_from_espn(target_date=target_date, limit=limit)
-            if performers:
-                logger.info(f"✅ ESPN API fallback succeeded: {len(performers)} performers")
-                return performers
-            else:
-                logger.error("❌ ESPN API fallback returned no performers")
-                raise Exception("Both NBA API and ESPN API failed")
-        except Exception as fallback_error:
-            logger.error(f"❌ ESPN API fallback also failed: {fallback_error}")
-            raise
+    except Exception as e:
+        logger.debug(f"⚠️ Error parsing team leaders: {e}")
+        return []
 
 
-def _parse_player_stats(player_row, game_row):
+def _parse_athlete_stats(athlete, team_abbr, all_leaders):
     """
-    Parse a player's stats from the box score row (V3 format).
-    Returns a dict with player info and key stats.
+    Parse les stats d'un joueur depuis ESPN.
+    
+    ESPN fournit les stats dans les "leaders" par catégorie.
+    On reconstruit un dict avec toutes les stats du joueur.
+    
+    Args:
+        athlete (dict): Données du joueur depuis ESPN
+        team_abbr (str): Abréviation de l'équipe
+        all_leaders (list): Tous les leaders (pour extraire rebounds, assists, etc.)
+    
+    Returns:
+        dict: Stats du joueur au format standard
+              {'name': ..., 'team': ..., 'pts': ..., 'reb': ..., ...}
     """
     try:
-        # Extract basic info (V3 uses firstName/familyName instead of PLAYER_NAME)
-        first_name = player_row.get('firstName', '')
-        family_name = player_row.get('familyName', '')
-        name = f"{first_name} {family_name}".strip() if first_name or family_name else 'Unknown'
-        team = player_row.get('teamTricode', 'UNK')
+        # Nom du joueur
+        name = athlete.get("athlete", {}).get("displayName", "Unknown")
         
-        # Extract stats from V3 format (camelCase instead of UPPER_CASE)
-        pts = int(player_row.get('points', 0)) if player_row.get('points') else 0
-        reb = int(player_row.get('reboundsTotal', 0)) if player_row.get('reboundsTotal') else 0
-        ast = int(player_row.get('assists', 0)) if player_row.get('assists') else 0
-        blk = int(player_row.get('blocks', 0)) if player_row.get('blocks') else 0
-        stl = int(player_row.get('steals', 0)) if player_row.get('steals') else 0
+        # Points (depuis le leader points)
+        pts = int(float(athlete.get("value", 0)))
         
-        # Calculate FG%
-        fgm = int(player_row.get('fieldGoalsMade', 0)) if player_row.get('fieldGoalsMade') else 0
-        fga = int(player_row.get('fieldGoalsAttempted', 1)) if player_row.get('fieldGoalsAttempted') else 1
-        fg_pct = round((fgm / fga * 100), 1) if fga > 0 else 0
+        # Rebounds et assists (chercher dans les autres leaders)
+        reb = _find_stat_for_player(name, "rebounds", all_leaders)
+        ast = _find_stat_for_player(name, "assists", all_leaders)
         
-        # Calculate 3P%
-        fg3m = int(player_row.get('threePointersMade', 0)) if player_row.get('threePointersMade') else 0
-        fg3a = int(player_row.get('threePointersAttempted', 1)) if player_row.get('threePointersAttempted') else 1
-        fg3_pct = round((fg3m / fg3a * 100), 1) if fg3a > 0 else 0
-        
+        # ESPN ne fournit pas toutes les stats détaillées dans les leaders
+        # On met des valeurs par défaut pour les stats manquantes
         performer = {
             'name': name,
-            'team': team,
+            'team': team_abbr,
             'pts': pts,
             'reb': reb,
             'ast': ast,
-            'blk': blk,
-            'stl': stl,
-            'fg_pct': fg_pct,
-            'fg3_pct': fg3_pct,
-            'fgm': fgm,
-            'fga': fga,
-            'fg3m': fg3m,
-            'fg3a': fg3a,
+            'blk': 0,  # ESPN leaders ne fournit pas blocks/steals
+            'stl': 0,
+            'fg_pct': 0.0,  # ESPN leaders ne fournit pas les %
+            'fg3_pct': 0.0,
+            'fgm': 0,
+            'fga': 0,
+            'fg3m': 0,
+            'fg3a': 0,
         }
         
         return performer
         
     except Exception as e:
-        logger.debug(f"⚠️ Error parsing player stats: {e}")
+        logger.debug(f"⚠️ Error parsing athlete stats: {e}")
         return None
+
+
+def _find_stat_for_player(player_name, stat_name, all_leaders):
+    """
+    Trouve une stat spécifique pour un joueur dans les leaders.
+    
+    Args:
+        player_name (str): Nom du joueur
+        stat_name (str): Nom de la stat (ex: "rebounds", "assists")
+        all_leaders (list): Tous les leaders du match
+    
+    Returns:
+        int: Valeur de la stat (0 si non trouvée)
+    """
+    try:
+        for leader_cat in all_leaders:
+            if leader_cat.get("name") == stat_name:
+                athletes = leader_cat.get("leaders", [])
+                for athlete in athletes:
+                    name = athlete.get("athlete", {}).get("displayName", "")
+                    if name == player_name:
+                        return int(float(athlete.get("value", 0)))
+        return 0
+    except:
+        return 0
