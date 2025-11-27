@@ -117,7 +117,7 @@ def build_prompt(games, news, top_performers):
     
     # === ÉTAPE 5: Construire le prompt final pour l'IA ===
     prompt = f""" YOUR ASSIGNMENT:
-You are an NBA journalists, with a style like the French media 'Trashtalk''s journalists can do, write a 10 minutes newsletter summary.
+You are an NBA journalists, with a style like the French media 'Trashtalk''s journalists can do, write an at least 10 minutes newsletter summary.
 Please, and I insist, only use the information you are provided in the prompt, do not invent any data or facts no information is better than false information. Follow this rule and the following guidelines strictly:
 1. Highlights the biggest upsets and dominant performances, without creating sections/titles whatsoever, without formatting either, only paragraphs.
 2. Roasts the losing teams with little humor.
@@ -135,7 +135,7 @@ Please, and I insist, only use the information you are provided in the prompt, d
 
 TONE: Profesional and Sharp, witty and serious, entertaining and factual, you love NBA drama, but you want to inform your readers first.
 STYLE: Mix facts with a bit of personality, be bold and opinionated, but stay professional before all.
-LENGTH: Make it substantial - give readers real insights with entertainment value
+LENGTH: Make it substantial - give readers real insights with entertainment value. Develop a bit on the key games and players of the night based on the data provided, but no hallucination.
 
 DATA : 
 TONIGHT'S BIGGEST WINS:
