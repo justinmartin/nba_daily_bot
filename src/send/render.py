@@ -400,4 +400,4 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
             </div>
         </div>
     </body>
-    </html>
+    </html> """

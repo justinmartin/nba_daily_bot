@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 ESPN_NBA_RSS = "https://www.espn.com/espn/rss/nba/news"
 
-def fetch_news(limit=5, include_content=True):
+def fetch_news(limit=8, include_content=True):
     try:
         feed = feedparser.parse(ESPN_NBA_RSS)
         

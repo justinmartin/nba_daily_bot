@@ -50,7 +50,7 @@ def build_prompt(games, news, top_performers):
     
     wins_text = "\n".join(wins_desc)
     
-    news_headlines = "\n".join([f"• {n['title']}" for n in news[:5]]) if news else ""
+    news_headlines = "\n".join([f"• {n['title']}" for n in news[:8]]) if news else ""
     
     close_games = sum(1 for g in games if abs(g.home_score - g.away_score) <= 5)
     blowouts = sum(1 for g in games if abs(g.home_score - g.away_score) > 15)
@@ -220,7 +220,7 @@ def run(dry_run=False):
             all_top_performers = []
         
         logger.info("📰 Fetching news...")
-        news = fetch_news(limit=5)  # Top 5 headlines du jour
+        news = fetch_news(limit=8)  # Top 8 headlines du jour
         
         logger.info("🎬 Fetching Top 10 Plays video...")
         top_10_video = get_top_10_plays_video(target_date=target)
