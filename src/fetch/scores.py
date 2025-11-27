@@ -1,9 +1,3 @@
-"""
-NBA Scores Fetcher via ESPN API.
-
-Ce module récupère les scores NBA en utilisant l'API ESPN.
-ESPN API est gratuite, rapide et fonctionne sur GitHub Actions (contrairement à stats.nba.com).
-"""
 
 import logging
 from datetime import date
@@ -13,10 +7,8 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class Game:
-    """Structure pour représenter un match NBA."""
     id: str
     date: str
     home_team: str
@@ -28,8 +20,6 @@ class Game:
     away_wins: int = None
     away_losses: int = None
 
-
-# Mapping ESPN team names → noms courts
 ESPN_TEAM_MAP = {
     'Atlanta Hawks': 'Hawks',
     'Boston Celtics': 'Celtics',
@@ -63,26 +53,8 @@ ESPN_TEAM_MAP = {
     'Washington Wizards': 'Wizards',
 }
 
-
 def get_games(d: date) -> List[Game]:
-    """
-    Récupère les scores NBA depuis ESPN API.
-    
-    ESPN a une API non documentée mais gratuite et rapide.
-    Plus fiable que stats.nba.com pour GitHub Actions.
-    
-    Args:
-        d (date): Date des matchs
-    
-    Returns:
-        List[Game]: Liste des matchs avec scores
-    
-    Note:
-        ESPN API ne fournit pas toujours les records (W-L),
-        donc home_wins/losses peuvent être None.
-    """
     try:
-        # ESPN API endpoint (format : YYYYMMDD)
         date_str = d.strftime('%Y%m%d')
         url = f'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={date_str}'
         
@@ -99,28 +71,24 @@ def get_games(d: date) -> List[Game]:
         
         for event in events:
             try:
-                # Extraire les équipes
                 competitions = event.get('competitions', [{}])[0]
                 competitors = competitions.get('competitors', [])
                 
                 if len(competitors) != 2:
                     continue
                 
-                # ESPN met home en premier, away en second (parfois inversé)
                 home_comp = next((c for c in competitors if c.get('homeAway') == 'home'), competitors[0])
                 away_comp = next((c for c in competitors if c.get('homeAway') == 'away'), competitors[1])
                 
                 home_team = home_comp.get('team', {}).get('displayName', 'Unknown')
                 away_team = away_comp.get('team', {}).get('displayName', 'Unknown')
                 
-                # Mapper vers noms courts
                 home_team = ESPN_TEAM_MAP.get(home_team, home_team)
                 away_team = ESPN_TEAM_MAP.get(away_team, away_team)
                 
                 home_score = int(home_comp.get('score', 0))
                 away_score = int(away_comp.get('score', 0))
                 
-                # Records (si disponibles)
                 home_record = home_comp.get('records', [{}])[0].get('summary')
                 away_record = away_comp.get('records', [{}])[0].get('summary')
                 
@@ -162,7 +130,5 @@ def get_games(d: date) -> List[Game]:
         logger.error(f"❌ ESPN API failed: {e}")
         return []
 
-
-# Alias pour compatibilité avec le code existant qui utilise get_games_by_date
 get_games_by_date = get_games
 

@@ -1,60 +1,14 @@
-"""
-Module de rendu HTML pour la newsletter NBA Daily.
-
-Ce module génère le code HTML complet de l'email newsletter avec:
-    - En-tête stylisé avec dégradé violet (couleurs NBA)
-    - Résumé généré par l'IA
-    - Résultats des matchs avec top performers
-    - Tableau des 5 meilleurs joueurs de la soirée
-    - Section vidéo Top 10 Plays YouTube
-    - Actualités ESPN avec liens
-    - Footer automatique
-
-Le HTML généré est compatible avec les clients email (inline CSS, pas de JS).
-"""
 
 from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
 
-
 def render_email(summary_text, news, top_performers=None, games=None, organized_games=None, top_10_video=None):
-    """
-    Génère le HTML complet de la newsletter NBA Daily.
-    
-    Args:
-        summary_text (str): Texte généré par l'IA (résumé de la soirée)
-        news (list[dict]): Actualités ESPN [{title, link, published}, ...]
-        top_performers (list[dict], optional): Stats des meilleurs joueurs
-        games (list[Game], optional): Liste des matchs (fallback si organized_games absent)
-        organized_games (list[dict], optional): Matchs organisés avec performers
-        top_10_video (dict, optional): Infos vidéo YouTube {title, url, thumbnail, ...}
-    
-    Returns:
-        str: Code HTML complet prêt à être envoyé par email
-    
-    Structure du HTML:
-        1. Header (titre + date)
-        2. Summary (texte généré par l'IA)
-        3. Game Results (scores + top performers par match)
-        4. Top 5 Performers (tableau global)
-        5. Top 10 Plays (vidéo YouTube si disponible)
-        6. Latest News (actualités ESPN)
-        7. Footer (mention bot automatique)
-    
-    Style:
-        - Dégradé violet/mauve (#667eea → #764ba2)
-        - Responsive (adapté mobile et desktop)
-        - Inline CSS (requis pour compatibilité email)
-        - Emojis pour améliorer la lisibilité
-    """
-    # === ÉTAPE 1: Valider et initialiser les paramètres ===
     if not summary_text or not summary_text.strip():
         logger.warning("Summary text is empty")
         summary_text = "No summary available"
     
-    # Valeurs par défaut pour les paramètres optionnels
     if news is None:
         news = []
     
@@ -70,13 +24,9 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     if top_10_video is None:
         top_10_video = None
     
-    # === ÉTAPE 2: Préparer les données pour le template ===
-    # Date actuelle formatée (ex: "Monday, November 24 2025")
     today = datetime.now().strftime("%A, %B %d %Y")
-    # Convertit les retours à la ligne en <br> pour le HTML
     summary_html = summary_text.replace("\n", "<br>")
     
-    # === ÉTAPE 3: Construire le HTML (header + styles) ===
     
     html = """<!DOCTYPE html>
     <html>
@@ -259,11 +209,9 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                 <div class="section">
                     <h2>🔥 TONIGHT'S SUMMARY</h2>
                     <div class="summary">
-                        """ + summary_html + """
                     </div>
                 </div>"""
     
-    # Add games section
     if organized_games:
         html += """
                 <div class="section">
@@ -280,7 +228,6 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                                 <strong>Margin:</strong> {game['margin']} points
                             </div>"""
             
-            # Add top performers for winner
             if game['winner_top_performers']:
                 html += "<div style='margin-top: 10px; font-size: 13px; color: #1a5f1a; background: #f0f8f0; padding: 8px; border-radius: 3px;'><strong>🏆 Winner's Top Performers:</strong><br>"
                 for p in game['winner_top_performers']:
@@ -295,7 +242,6 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                     html += f"&nbsp;&nbsp;• <strong>{p['name']}</strong>: {stats}<br>"
                 html += "</div>"
             
-            # Add best performer for loser
             if game['loser_top_performers']:
                 html += "<div style='margin-top: 8px; font-size: 13px; color: #663333; background: #f8f0f0; padding: 8px; border-radius: 3px;'><strong>🔥 Best from Losing Team:</strong><br>"
                 p = game['loser_top_performers'][0]
@@ -317,14 +263,12 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                     </div>
                 </div>"""
     elif games:
-        # Fallback to old format if organized_games not available
         html += """
                 <div class="section">
                     <h2>📊 GAME RESULTS</h2>
                     <div class="scores-list">"""
         
         for game in games:
-            # Determine winner and loser
             away_wins = f"({game.away_wins}-{game.away_losses})" if game.away_wins else ""
             home_wins = f"({game.home_wins}-{game.home_losses})" if game.home_wins else ""
             
@@ -345,13 +289,11 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                     </div>
                 </div>"""
     
-    # Add top performers section (top 5 overall)
     html += """
                 <div class="section">
                     <h2>👑 TOP 5 PERFORMERS OF THE NIGHT</h2>"""
     
     if top_performers:
-        # Deduplicate by player name and get top 5 by points
         seen_names = set()
         deduplicated = []
         for p in top_performers:
@@ -360,7 +302,6 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                 seen_names.add(player_name)
                 deduplicated.append(p)
         
-        # Sort by points and get top 5
         sorted_performers = sorted(deduplicated, key=lambda x: x.get('pts', 0), reverse=True)[:5]
         
         html += """
@@ -387,7 +328,6 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                 blk_stl.append(f"{int(p['stl'])} STL")
             blk_stl_str = " / ".join(blk_stl) if blk_stl else "-"
             
-            # Alternate row colors
             row_bg = "#f9f9f9" if rank % 2 == 0 else "white"
             pts = int(p.get('pts', 0))
             rank_emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
@@ -414,7 +354,6 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     html += """
                 </div>"""
     
-    # Add Top 10 Plays section
     if top_10_video:
         html += f"""
                 
@@ -428,7 +367,6 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                     </div>
                 </div>"""
     
-    # Add news section
     if news:
         html += """
                 
@@ -463,6 +401,3 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
         </div>
     </body>
     </html>
-    """
-
-    return html

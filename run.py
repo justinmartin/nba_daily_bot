@@ -1,13 +1,7 @@
-#!/usr/bin/env python3
-"""
-NBA Daily Bot - Startup script
-Run with: python run.py [test|schedule|once]
-"""
 import sys
 import logging
 from pathlib import Path
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 logging.basicConfig(
@@ -38,8 +32,6 @@ def main():
             print("✅ Newsletter sent successfully!")
         except Exception as e:
             logging.error(f"❌ Run failed: {e}", exc_info=True)
-            # Exit with 0 to prevent GitHub Actions from marking as failed
-            # But log the full error for debugging
             print(f"\n{'='*60}")
             print(f"ERROR DETAILS:")
             print(f"{'='*60}")
