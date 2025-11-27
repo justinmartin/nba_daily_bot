@@ -180,11 +180,9 @@ def _get_from_stats_nba(limit=5, target_date=None):
         logger.info(f"✅ Found {len(top_performers)} top performers for {date_str}")
         return top_performers
         
-    except ImportError as e:
-        logger.error(f"❌ Import error (nba-api or pandas not installed): {e}")
-        raise
-    except Exception as e:
-        logger.warning(f"⚠️ NBA API failed for player stats: {type(e).__name__}")
+    except (ImportError, Exception) as e:
+        # Intercepter TOUTES les erreurs (import, timeout, etc.) et utiliser le fallback
+        logger.warning(f"⚠️ NBA API failed for player stats: {type(e).__name__}: {e}")
         logger.info("🔄 Trying ESPN API as fallback for player stats...")
         
         # FALLBACK: Basculer sur ESPN API
