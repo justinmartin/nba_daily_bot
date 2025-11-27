@@ -393,10 +393,16 @@ def run(dry_run=False):
         logger.info("🔥 Fetching top performers...")
         all_top_performers = []
         
+        # Convertir la date string en objet date pour l'API
+        # game.date est une string "YYYY-MM-DD", on doit la convertir en objet date
+        from datetime import datetime as dt
+        game_date_obj = dt.strptime(games[0].date, '%Y-%m-%d').date() if games else target
+        
         for game in games:
             try:
                 # get_top_performers retourne les 5 meilleurs joueurs du match
-                performers = get_top_performers(game.id, limit=5, target_date=game.date)
+                # On utilise game_date_obj (objet date) au lieu de game.date (string)
+                performers = get_top_performers(game.id, limit=5, target_date=game_date_obj)
                 all_top_performers.extend(performers)
             except Exception as e:
                 # Si un match échoue, on continue avec les autres
