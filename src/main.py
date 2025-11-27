@@ -44,12 +44,13 @@ cfg = Config()
 # Convertit les tricodes NBA (ex: "LAL") en noms complets (ex: "Lakers")
 # Source: Liste officielle des 30 équipes NBA (saison 2024-2025)
 TRICODE_TO_NAME = {
-    'ATL': 'Hawks', 'BOS': 'Celtics', 'CLE': 'Cavaliers', 'NOP': 'Pelicans',
-    'CHI': 'Bulls', 'DAL': 'Mavericks', 'MEM': 'Grizzlies', 'GSW': 'Warriors',
-    'HOU': 'Rockets', 'LAC': 'Clippers', 'LAL': 'Lakers', 'MIA': 'Heat',
-    'MIL': 'Bucks', 'MIN': 'Timberwolves', 'BRK': 'Nets', 'NYK': 'Knicks',
-    'ORL': 'Magic', 'PHI': '76ers', 'PHX': 'Suns', 'POR': 'Trail Blazers',
-    'SAC': 'Kings', 'SAS': 'Spurs', 'OKC': 'Thunder', 'TOR': 'Raptors',
+    'ATL': 'Hawks', 'BOS': 'Celtics', 'BRK': 'Nets', 'CHA': 'Hornets',
+    'CHI': 'Bulls', 'CLE': 'Cavaliers', 'DAL': 'Mavericks', 'DEN': 'Nuggets',
+    'DET': 'Pistons', 'GSW': 'Warriors', 'HOU': 'Rockets', 'IND': 'Pacers',
+    'LAC': 'Clippers', 'LAL': 'Lakers', 'MEM': 'Grizzlies', 'MIA': 'Heat',
+    'MIL': 'Bucks', 'MIN': 'Timberwolves', 'NOP': 'Pelicans', 'NYK': 'Knicks',
+    'OKC': 'Thunder', 'ORL': 'Magic', 'PHI': '76ers', 'PHX': 'Suns',
+    'POR': 'Trail Blazers', 'SAC': 'Kings', 'SAS': 'Spurs', 'TOR': 'Raptors',
     'UTA': 'Jazz', 'WAS': 'Wizards'
 }
 
