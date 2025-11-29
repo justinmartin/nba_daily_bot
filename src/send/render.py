@@ -209,6 +209,7 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                 <div class="section">
                     <h2>🔥 TONIGHT'S SUMMARY</h2>
                     <div class="summary">
+                        """ + summary_html + """
                     </div>
                 </div>"""
     
