@@ -28,7 +28,9 @@ TRICODE_TO_NAME = {
     'MIL': 'Bucks', 'MIN': 'Timberwolves', 'NOP': 'Pelicans', 'NYK': 'Knicks',
     'OKC': 'Thunder', 'ORL': 'Magic', 'PHI': '76ers', 'PHX': 'Suns',
     'POR': 'Trail Blazers', 'SAC': 'Kings', 'SAS': 'Spurs', 'TOR': 'Raptors',
-    'UTA': 'Jazz', 'WAS': 'Wizards'
+    'UTA': 'Jazz', 'WAS': 'Wizards',
+    'UTAH': 'Jazz', 'NY': 'Knicks', 'SA': 'Spurs', 'NO': 'Pelicans',
+    'BKN': 'Nets', 'GS': 'Warriors', 'WSH': 'Wizards'
 }
 
 NAME_TO_TRICODE = {v: k for k, v in TRICODE_TO_NAME.items()}
@@ -50,7 +52,15 @@ def build_prompt(games, news, top_performers):
     
     wins_text = "\n".join(wins_desc)
     
-    news_headlines = "\n".join([f"• {n['title']}" for n in news[:8]]) if news else ""
+    news_section = []
+    for n in news[:8]:
+        title = n.get('title', 'No title')
+        summary = n.get('summary', '')
+        if summary:
+            news_section.append(f"• {title}\n  {summary}")
+        else:
+            news_section.append(f"• {title}")
+    news_headlines = "\n\n".join(news_section) if news_section else ""
     
     close_games = sum(1 for g in games if abs(g.home_score - g.away_score) <= 5)
     blowouts = sum(1 for g in games if abs(g.home_score - g.away_score) > 15)
@@ -156,7 +166,8 @@ def format_performers_for_prompt(organized_games):
         if game['winner_top_performers']:
             performers_text += "  🏆 Winner's stars:\n"
             for p in game['winner_top_performers']:
-                team_display = TRICODE_TO_NAME.get(p.get('team'), p.get('team', 'N/A'))
+                team_tricode = p.get('team', 'N/A')
+                team_display = TRICODE_TO_NAME.get(team_tricode, team_tricode)
                 
                 stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}%"
                 
@@ -168,12 +179,13 @@ def format_performers_for_prompt(organized_games):
                 if blk_stl:
                     stats += f", {', '.join(blk_stl)}"
                 
-                performers_text += f"    - {p['name']} ({team_display}): {stats}\n"
+                performers_text += f"    - {p['name']} ({team_tricode} - {team_display}): {stats}\n"
         
         if game['loser_top_performers']:
             performers_text += "  🔥 Leading loser:\n"
             for p in game['loser_top_performers']:
-                team_display = TRICODE_TO_NAME.get(p.get('team'), p.get('team', 'N/A'))
+                team_tricode = p.get('team', 'N/A')
+                team_display = TRICODE_TO_NAME.get(team_tricode, team_tricode)
                 stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}%"
                 blk_stl = []
                 if p.get('blk'):
@@ -182,7 +194,7 @@ def format_performers_for_prompt(organized_games):
                     blk_stl.append(f"{p.get('stl')}stl")
                 if blk_stl:
                     stats += f", {', '.join(blk_stl)}"
-                performers_text += f"    - {p['name']} ({team_display}): {stats}\n"
+                performers_text += f"    - {p['name']} ({team_tricode} - {team_display}): {stats}\n"
     
     return performers_text
 

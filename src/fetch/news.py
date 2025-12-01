@@ -32,7 +32,7 @@ def fetch_news(limit=8, include_content=True):
                     content = _scrape_article_content(entry.get("link"))
                     if content:
                         article["content"] = content
-                        article["summary"] = content[:500] + "..." if len(content) > 500 else content
+                        article["summary"] = content[:800] + "..." if len(content) > 800 else content
                 
                 headlines.append(article)
                 
@@ -71,8 +71,8 @@ def _scrape_article_content(url):
             
             content = ' '.join([p.get_text().strip() for p in paragraphs if p.get_text().strip()])
             
-            if len(content) > 1000:
-                content = content[:1000] + "..."
+            if len(content) > 1500:
+                content = content[:1500] + "..."
             
             logger.debug(f"✅ Scraped {len(content)} chars from article")
             return content
