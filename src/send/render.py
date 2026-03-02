@@ -34,7 +34,7 @@ def _render_upcoming_games(upcoming_games) -> str:
     """Render the 'Matchs à venir' section HTML."""
     section = """
                 <div class="section">
-                    <h2>📅 MATCHS À VENIR — CE SOIR</h2>
+                    <h2>📅 TONIGHT'S GAMES — Schedule and Streaming Info</h2>
                     <div class="scores-list">"""
 
     for g in upcoming_games:
