@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timedelta
 from src.config import Config
 from src.fetch.scores import get_games_by_date
+from src.fetch.schedule import get_upcoming_games
 from src.model.hf_client import generate
 import os
 from src.send.mailer import send_mail
@@ -65,6 +66,14 @@ def build_prompt(games, news, top_performers):
     close_games = sum(1 for g in games if abs(g.home_score - g.away_score) <= 5)
     blowouts = sum(1 for g in games if abs(g.home_score - g.away_score) > 15)
     
+    all_games_summary = []
+    for g in games:
+        away_record = f"({g.away_wins}-{g.away_losses})" if g.away_wins is not None else ""
+        home_record = f"({g.home_wins}-{g.home_losses})" if g.home_wins is not None else ""
+        margin = abs(g.away_score - g.home_score)
+        all_games_summary.append(f"• {g.away_team} {away_record} {g.away_score} - {g.home_score} {g.home_team} {home_record} | Margin: {margin}pts")
+    games_summary_text = "\n".join(all_games_summary)
+    
     performers_section = format_performers_for_prompt(organize_game_data(games, top_performers))
     
     prompt = f""" YOUR ASSIGNMENT:
@@ -95,6 +104,9 @@ GAME STATS:
 - Total games: {len(games)}
 - Blowouts (>15 pt margin): {blowouts}
 - Close games (≤5 pt margin): {close_games}
+
+ALL GAMES SUMMARY:
+{games_summary_text}
 
 {performers_section}
 
@@ -237,7 +249,16 @@ def run(dry_run=False):
         logger.info("🎬 Fetching Top 10 Plays video...")
         top_10_video = get_top_10_plays_video(target_date=target)
         
-        logger.info("📊 Organizing game data with top performers...")
+        logger.info("� Fetching upcoming games schedule...")
+        today = datetime.now().date()
+        try:
+            upcoming = get_upcoming_games(today)
+            logger.info(f"✅ Found {len(upcoming)} upcoming games for today")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to fetch upcoming games: {e}")
+            upcoming = []
+        
+        logger.info("�📊 Organizing game data with top performers...")
         organized_games = organize_game_data(games, all_top_performers)
         
         logger.info("🤖 Generating newsletter content...")
@@ -251,7 +272,7 @@ def run(dry_run=False):
             logger.warning(f"⚠️ Summary is empty or whitespace: {repr(summary[:100] if summary else 'None')}")
         
         logger.info("🎨 Rendering newsletter HTML...")
-        html = render_email(summary, news, all_top_performers, games, organized_games, top_10_video)
+        html = render_email(summary, news, all_top_performers, games, organized_games, top_10_video, upcoming)
         
         os.makedirs("out", exist_ok=True)  # Crée le dossier out/ si inexistant
         output_file = f"out/newsletter_{target}.html"

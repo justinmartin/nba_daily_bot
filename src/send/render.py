@@ -4,7 +4,70 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def render_email(summary_text, news, top_performers=None, games=None, organized_games=None, top_10_video=None):
+# Broadcast channel color scheme (French market)
+BROADCAST_STYLES = {
+    'bein sports':  {'color': '#6B2EAF', 'bold': True,  'label': 'beIN Sports'},
+    'bein':         {'color': '#6B2EAF', 'bold': True,  'label': 'beIN Sports'},
+    'prime video':  {'color': '#00A8E1', 'bold': False, 'label': 'Prime Video'},
+    'prime':        {'color': '#00A8E1', 'bold': False, 'label': 'Prime Video'},
+    'amazon prime': {'color': '#00A8E1', 'bold': False, 'label': 'Prime Video'},
+    'league pass':  {'color': '#1D428A', 'bold': False, 'label': 'League Pass'},
+    'nba tv':       {'color': '#1D428A', 'bold': False, 'label': 'NBA TV'},
+    'canal+':       {'color': '#1A1A1A', 'bold': False, 'label': 'Canal+'},
+}
+
+
+def _broadcaster_badge(name: str) -> str:
+    """Return an HTML badge for a broadcaster name."""
+    key = name.lower().strip()
+    style = BROADCAST_STYLES.get(key, {'color': '#555', 'bold': False, 'label': name})
+    weight = 'font-weight:700;' if style['bold'] else 'font-weight:600;'
+    return (
+        f'<span style="display:inline-block; padding:3px 10px; margin:2px 4px; '
+        f'border-radius:4px; font-size:12px; {weight} '
+        f'color:white; background:{style["color"]};">'
+        f'{style["label"]}</span>'
+    )
+
+
+def _render_upcoming_games(upcoming_games) -> str:
+    """Render the 'Matchs à venir' section HTML."""
+    section = """
+                <div class="section">
+                    <h2>📅 MATCHS À VENIR — CE SOIR</h2>
+                    <div class="scores-list">"""
+
+    for g in upcoming_games:
+        # Only show scheduled (not started) games
+        if g.game_status == 3:
+            continue
+
+        badges = ' '.join(_broadcaster_badge(b) for b in g.broadcasters)
+
+        section += f"""
+                        <div class="score-item" style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;">
+                            <div style="flex:1; min-width:200px;">
+                                <div style="font-weight:700; font-size:15px; color:#1a1a1a;">
+                                    {g.away_team} <span style="color:#999; font-size:12px;">({g.away_record})</span>
+                                    &nbsp;@&nbsp;
+                                    {g.home_team} <span style="color:#999; font-size:12px;">({g.home_record})</span>
+                                </div>
+                                <div style="margin-top:6px; font-size:13px; color:#667eea; font-weight:600;">
+                                    🕐 {g.game_time_fr}
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                {badges}
+                            </div>
+                        </div>"""
+
+    section += """
+                    </div>
+                </div>"""
+    return section
+
+
+def render_email(summary_text, news, top_performers=None, games=None, organized_games=None, top_10_video=None, upcoming_games=None):
     if not summary_text or not summary_text.strip():
         logger.warning("Summary text is empty")
         summary_text = "No summary available"
@@ -23,6 +86,9 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     
     if top_10_video is None:
         top_10_video = None
+    
+    if upcoming_games is None:
+        upcoming_games = []
     
     today = datetime.now().strftime("%A, %B %d %Y")
     summary_html = summary_text.replace("\n", "<br>")
@@ -368,6 +434,10 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                     </div>
                 </div>"""
     
+    # --- UPCOMING GAMES (Matchs à venir) section ---
+    if upcoming_games:
+        html += _render_upcoming_games(upcoming_games)
+
     if news:
         html += """
                 
