@@ -1,6 +1,7 @@
 
 from datetime import datetime
 import logging
+from html import escape
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,8 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
         upcoming_games = []
     
     today = datetime.now().strftime("%A, %B %d %Y")
-    summary_html = summary_text.replace("\n", "<br>")
+    # Escape model output so accidental HTML does not break the newsletter layout.
+    summary_html = escape(summary_text).replace("\n", "<br>")
     
     
     html = """<!DOCTYPE html>
