@@ -14,7 +14,9 @@ class Config:
     
     USE_HF_INF_API = os.getenv("USE_HF_INF_API", "false").lower() == "true"
     HF_API_TOKEN = os.getenv("HF_API_TOKEN")
-    MODEL_ID = os.getenv("MODEL_ID", "EleutherAI/gpt-neo-125M")
+    # HF Router chat/completions often requires provider suffix (ex: :featherless-ai)
+    MODEL_ID = os.getenv("MODEL_ID", "mistralai/Mistral-7B-Instruct-v0.2:featherless-ai")
+    HF_PROVIDER = os.getenv("HF_PROVIDER", "featherless-ai")
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", 400))
     
     CACHE_PATH = os.getenv("CACHE_PATH", "./data/cache.db")

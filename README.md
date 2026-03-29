@@ -29,6 +29,8 @@ Copy `.env.example` to `.env` and fill in:
 ```env
 # HuggingFace API (for LLM)
 HF_API_TOKEN=your_huggingface_token
+MODEL_ID=mistralai/Mistral-7B-Instruct-v0.2:featherless-ai
+HF_PROVIDER=featherless-ai
 
 # Email (Gmail)
 MAIL_SMTP_HOST=smtp.gmail.com
@@ -58,6 +60,7 @@ The bot runs automatically via GitHub Actions:
 
 1. Add all environment variables as **Repository Secrets**:
    - `HF_API_TOKEN`
+  - `MODEL_ID`, `HF_PROVIDER`, `USE_HF_INF_API`
    - `MAIL_SMTP_HOST`, `MAIL_SMTP_PORT`, `MAIL_SMTP_USER`, `MAIL_SMTP_PASSWORD`
    - `NEWS_RECIPIENT`
    - `MAX_TOKENS`, `BOT_RUN_TIME`
@@ -109,6 +112,12 @@ nba_daily_bot/
 - **HTML**: Jinja2, Premailer
 
 ## Troubleshooting
+
+### 400 Bad Request from HuggingFace Router
+- Use a provider-suffixed model in `MODEL_ID`, for example:
+  `mistralai/Mistral-7B-Instruct-v0.2:featherless-ai`
+- If `MODEL_ID` has no provider suffix, set `HF_PROVIDER` (default fallback is `featherless-ai`)
+- Check GitHub Action secrets: `MODEL_ID`, `HF_PROVIDER`, `HF_API_TOKEN`
 
 ### "No module named 'pandas'" or "No module named 'nba_api'"
 ```bash

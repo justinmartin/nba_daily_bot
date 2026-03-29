@@ -43,6 +43,7 @@ jobs:
           USE_HF_INF_API: ${{ secrets.USE_HF_INF_API }}
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
           MODEL_ID: ${{ secrets.MODEL_ID }}
+          HF_PROVIDER: ${{ secrets.HF_PROVIDER }}
           MAX_TOKENS: ${{ secrets.MAX_TOKENS }}
           CACHE_PATH: ${{ secrets.CACHE_PATH }}
         run: |
