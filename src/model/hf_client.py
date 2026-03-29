@@ -55,35 +55,6 @@ def _extract_safe_max_tokens(error_message: str):
     return safe_budget
 
 
-def _extract_message_and_finish_reason(result: dict):
-    choices = result.get("choices", []) if isinstance(result, dict) else []
-    if not choices:
-        return "", ""
-    first = choices[0] or {}
-    message = first.get("message", {}).get("content", "") or ""
-    finish_reason = first.get("finish_reason", "") or ""
-    return message, finish_reason
-
-
-def _looks_cut_off(text: str) -> bool:
-    if not text:
-        return False
-    stripped = text.rstrip()
-    if len(stripped) < 120:
-        return False
-    return stripped[-1] not in {".", "!", "?", '"', "'", "…"}
-
-
-def _continue_prompt(existing_text: str) -> str:
-    tail = existing_text[-1400:]
-    return (
-        "Continue this NBA recap seamlessly from where it stopped. "
-        "Do not repeat previous sentences. Do not add title or conclusion. "
-        "Start directly with the next sentence and add concrete game details from the provided context only.\n\n"
-        f"Text so far:\n{tail}\n\nContinue:"
-    )
-
-
 def generate_with_hf_openai_api(prompt: str, max_tokens: int = None):
     try:
         import requests
@@ -153,44 +124,10 @@ def generate_with_hf_openai_api(prompt: str, max_tokens: int = None):
             else:
                 raise
         
-        message, finish_reason = _extract_message_and_finish_reason(result)
-        if message:
-            min_chars = max(200, cfg.MIN_SUMMARY_CHARS)
-            continuation_limit = max(0, cfg.MAX_SUMMARY_CONTINUATIONS)
-            chunk_max_tokens = min(max_tokens or cfg.MAX_TOKENS, 450)
-
-            for idx in range(continuation_limit):
-                too_short = len(message.strip()) < min_chars
-                cut_off = finish_reason == "length" or _looks_cut_off(message)
-                if not too_short and not cut_off:
-                    break
-
-                logger.warning(
-                    "⚠️ Summary short/cut (len=%s, finish_reason=%s). Requesting continuation %s/%s.",
-                    len(message.strip()),
-                    finish_reason or "unknown",
-                    idx + 1,
-                    continuation_limit,
-                )
-
-                continuation_prompt = _continue_prompt(message)
-                continuation_payload = _build_payload(
-                    model_id=model_id,
-                    prompt=continuation_prompt,
-                    max_tokens=chunk_max_tokens,
-                )
-                try:
-                    continuation_result = _post_chat_completion(requests, api_url, headers, continuation_payload)
-                    continuation_text, continuation_finish_reason = _extract_message_and_finish_reason(continuation_result)
-                    if not continuation_text:
-                        break
-                    message = f"{message.rstrip()} {continuation_text.lstrip()}"
-                    finish_reason = continuation_finish_reason
-                except Exception as cont_err:
-                    logger.warning(f"⚠️ Continuation request failed, using current summary: {cont_err}")
-                    break
-
-            return message
+        if "choices" in result and len(result["choices"]) > 0:
+            message = result["choices"][0].get("message", {}).get("content", "")
+            if message:
+                return message
         
         logger.error(f"❌ Unexpected response format: {result}")
         raise ValueError("Invalid response format from HF API")

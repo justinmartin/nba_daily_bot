@@ -41,8 +41,6 @@ NEWS_RECIPIENT=recipient@email.com
 
 # Optional
 MAX_TOKENS=2000
-MIN_SUMMARY_CHARS=2500
-MAX_SUMMARY_CONTINUATIONS=6
 BOT_RUN_TIME=07:30
 ```
 
@@ -120,11 +118,6 @@ nba_daily_bot/
   `mistralai/Mistral-7B-Instruct-v0.2:featherless-ai`
 - If `MODEL_ID` has no provider suffix, set `HF_PROVIDER` (default fallback is `featherless-ai`)
 - Check GitHub Action secrets: `MODEL_ID`, `HF_PROVIDER`, `HF_API_TOKEN`
-
-### Summary still too short
-- Increase `MIN_SUMMARY_CHARS` (ex: `2500` to `5000`)
-- Increase `MAX_SUMMARY_CONTINUATIONS` (ex: `6`)
-- Keep `MAX_TOKENS` reasonable; the bot now auto-reduces per request when context is too large
 
 ### "No module named 'pandas'" or "No module named 'nba_api'"
 ```bash

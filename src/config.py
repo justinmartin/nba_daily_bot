@@ -18,8 +18,6 @@ class Config:
     MODEL_ID = os.getenv("MODEL_ID", "mistralai/Mistral-7B-Instruct-v0.2:featherless-ai")
     HF_PROVIDER = os.getenv("HF_PROVIDER", "featherless-ai")
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", 400))
-    MIN_SUMMARY_CHARS = int(os.getenv("MIN_SUMMARY_CHARS", 1800))
-    MAX_SUMMARY_CONTINUATIONS = int(os.getenv("MAX_SUMMARY_CONTINUATIONS", 4))
     
     CACHE_PATH = os.getenv("CACHE_PATH", "./data/cache.db")
     
