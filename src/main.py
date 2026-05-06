@@ -55,12 +55,13 @@ def build_prompt(games, news, top_performers):
     
     news_section = []
     for n in news[:8]:
+        source = n.get('source', 'News')
         title = n.get('title', 'No title')
         summary = n.get('summary', '')
         if summary:
-            news_section.append(f"• {title}\n  {summary}")
+            news_section.append(f"• [{source}] {title}\n  {summary[:220].strip()}")
         else:
-            news_section.append(f"• {title}")
+            news_section.append(f"• [{source}] {title}")
     news_headlines = "\n\n".join(news_section) if news_section else ""
     
     close_games = sum(1 for g in games if abs(g.home_score - g.away_score) <= 5)
@@ -244,7 +245,7 @@ def run(dry_run=False):
             all_top_performers = []
         
         logger.info("📰 Fetching news...")
-        news = fetch_news(limit=8)  # Top 8 headlines du jour
+        news = fetch_news(include_content=False)  # 3 Trashtalk + 5 Athletic RSS items
         
         logger.info("🎬 Fetching Top 10 Plays video...")
         top_10_video = get_top_10_plays_video(target_date=target)
