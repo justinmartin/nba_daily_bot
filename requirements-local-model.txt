@@ -1,0 +1,5 @@
+# Uniquement pour USE_HF_INF_API=false (modèle exécuté en local)
+-r requirements.txt
+transformers>=4.20.0
+torch>=1.10.0
+accelerate

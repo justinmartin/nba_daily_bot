@@ -211,6 +211,41 @@ def format_performers_for_prompt(organized_games):
     
     return performers_text
 
+def send_schedule_only(target, dry_run=False):
+    """Pas de match la veille : si des matchs sont prévus ce soir (reprise de saison,
+    lendemain de break), envoie un mail court avec le programme et les news.
+    Sinon (vraie intersaison), n'envoie rien."""
+    today = datetime.now().date()
+    try:
+        upcoming = get_upcoming_games(today)
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to fetch upcoming games: {e}")
+        upcoming = []
+
+    if not upcoming:
+        logger.info("✨ No games last night and none tonight - no newsletter (off-season)")
+        return
+
+    logger.info(f"📅 No games last night, {len(upcoming)} tonight - sending schedule-only newsletter")
+    news = fetch_news(include_content=False)
+    summary = (
+        f"Pas de match cette nuit. {len(upcoming)} match(s) au programme ce soir : "
+        "retrouvez les horaires et diffuseurs ci-dessous, ainsi que les dernières news."
+    )
+    html = render_email(summary, news, upcoming_games=upcoming)
+
+    os.makedirs("out", exist_ok=True)
+    output_file = f"out/newsletter_{target}_schedule.html"
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(html)
+    logger.info(f"✅ Newsletter saved to {output_file}")
+
+    if dry_run:
+        logger.info("⏭️ Dry run mode - skipping email send")
+        return
+    send_mail(html, f"NBA Daily — Programme du {today}")
+    logger.info(f"✅ Email sent to {cfg.NEWS_RECIPIENT}")
+
 def run(dry_run=False):
     try:
         
@@ -226,9 +261,9 @@ def run(dry_run=False):
             return  # Exit code 0 (pas d'email envoyé, mais pas d'erreur non plus)
         
         if not games:
-            logger.warning("⚠️ No games found for this date - skipping newsletter")
-            logger.info("✨ No newsletter to send today (no games played)")
-            return  # Pas de matchs = pas de newsletter
+            logger.warning("⚠️ No games found for this date")
+            send_schedule_only(target, dry_run)  # Intersaison / jours off : programme du soir si matchs
+            return
         
         logger.info("🔥 Fetching top performers...")
         all_top_performers = []
