@@ -14,21 +14,21 @@ on:
 jobs:
   nba-newsletter:
     runs-on: ubuntu-latest
-    timeout-minutes: 45  # Increased to 45 min (5 retries × 60s timeout + processing time)
+    timeout-minutes: 20
     
     steps:
       - name: 📥 Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: 🐍 Setup Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
       
       - name: 📦 Install dependencies
         run: |
-          pip install --no-cache-dir -r requirements.txt
+          pip install -r requirements.txt
       
       - name: 🚀 Generate and send newsletter
         env:
@@ -51,7 +51,7 @@ jobs:
       
       - name: 📤 Upload newsletter output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: newsletter
           path: out/
