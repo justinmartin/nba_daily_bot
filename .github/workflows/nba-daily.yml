@@ -53,6 +53,7 @@ jobs:
         if: steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true'
         run: |
           pip install -r requirements.txt
+          npm install -g @anthropic-ai/claude-code
 
       - name: 🚀 Generate and send newsletter
         if: steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true'
@@ -65,6 +66,9 @@ jobs:
           TIMEZONE: ${{ secrets.TIMEZONE }}
           BOT_RUN_TIME: ${{ secrets.BOT_RUN_TIME }}
           BALLDONTLIE_API_KEY: ${{ secrets.BALLDONTLIE_API_KEY }}
+          # Rédaction par Claude (abonnement), Hugging Face en secours
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_MODEL: claude-sonnet-5-5
           USE_HF_INF_API: ${{ secrets.USE_HF_INF_API }}
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
           # Modèle principal puis secours (HF Inference Providers)

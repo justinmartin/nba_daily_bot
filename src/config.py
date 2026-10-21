@@ -18,6 +18,9 @@ class Config:
     MODEL_ID = os.getenv("MODEL_ID") or "moonshotai/Kimi-K3"
     # Modèles de secours, séparés par des virgules
     MODEL_FALLBACKS = [m.strip() for m in (os.getenv("MODEL_FALLBACKS") or "deepseek-ai/DeepSeek-V4.1-Flash,zai-org/GLM-5.3").split(",")]
+    # Rédaction par Claude via l'abonnement (jeton créé avec `claude setup-token`)
+    CLAUDE_CODE_OAUTH_TOKEN = os.getenv("CLAUDE_CODE_OAUTH_TOKEN")
+    CLAUDE_MODEL = os.getenv("CLAUDE_MODEL") or "claude-sonnet-5-5"
     HF_PROVIDER = os.getenv("HF_PROVIDER", "featherless-ai")
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", 400))
     

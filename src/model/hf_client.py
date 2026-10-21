@@ -186,10 +186,47 @@ def generate_local(prompt: str, max_tokens: int = None):
         logger.error(f"❌ Local model generation error: {e}")
         raise
 
+def generate_with_claude_code(prompt: str):
+    """Rédige via Claude Code (`claude -p`), authentifié par l'abonnement Claude (CLAUDE_CODE_OAUTH_TOKEN)."""
+    import json
+    import shutil
+    import subprocess
+
+    if not shutil.which("claude"):
+        raise RuntimeError("❌ Claude Code CLI not installed")
+
+    logger.info(f"🤖 Using Claude Code with model {cfg.CLAUDE_MODEL}")
+    cmd = [
+        "claude", "-p",
+        "--model", cfg.CLAUDE_MODEL,
+        "--output-format", "json",
+        "--tools", "",  # simple rédaction : aucun outil
+        "--no-session-persistence",
+    ]
+    proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=300)
+    try:
+        result = json.loads(proc.stdout)
+    except Exception:
+        raise RuntimeError(f"Claude Code a échoué ({proc.returncode}) : {(proc.stderr or proc.stdout)[:500]}")
+    text = (result.get("result") or "").strip()
+    if proc.returncode != 0 or result.get("is_error") or not text:
+        raise RuntimeError(f"Claude Code a échoué : {text[:500] or proc.stderr[:500]}")
+    return text
+
+
 def generate(prompt: str, max_tokens: int = None):
     if not prompt or not prompt.strip():
         raise ValueError("❌ Prompt cannot be empty")
-    
+
+    # Claude (abonnement) en priorité, puis Hugging Face en secours
+    if cfg.CLAUDE_CODE_OAUTH_TOKEN:
+        try:
+            return generate_with_claude_code(prompt)
+        except Exception as e:
+            logger.error(f"❌ Claude Code generation failed: {e}")
+            if not cfg.USE_HF_INF_API:
+                raise
+
     if not cfg.USE_HF_INF_API:
         return generate_local(prompt, max_tokens=max_tokens)
 
