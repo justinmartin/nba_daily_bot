@@ -35,7 +35,7 @@ def _render_upcoming_games(upcoming_games) -> str:
     """Render the 'Matchs à venir' section HTML."""
     section = """
                 <div class="section">
-                    <h2>📅 TONIGHT'S GAMES — Schedule and Streaming Info</h2>
+                    <h2>📅 CE SOIR — Programme et diffuseurs</h2>
                     <div class="scores-list">"""
 
     for g in upcoming_games:
@@ -71,7 +71,7 @@ def _render_upcoming_games(upcoming_games) -> str:
 def render_email(summary_text, news, top_performers=None, games=None, organized_games=None, top_10_video=None, upcoming_games=None):
     if not summary_text or not summary_text.strip():
         logger.warning("Summary text is empty")
-        summary_text = "No summary available"
+        summary_text = "Pas de récap aujourd'hui."
     
     if news is None:
         news = []
@@ -95,7 +95,8 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     from datetime import timedelta
     _now = datetime.now()
     _prev = _now - timedelta(days=1)
-    today = f"Night of {_prev.strftime('%B %d')} → {_now.strftime('%B %d, %Y')}"
+    _M = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"]
+    today = f"Nuit du {_prev.day} au {_now.day} {_M[_now.month - 1]} {_now.year}"
     # Escape model output so accidental HTML does not break the newsletter layout.
     summary_html = escape(summary_text).replace("\n", "<br>")
     
@@ -273,13 +274,13 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     <body>
         <div class="container">
             <div class="header">
-                <h1>🏀 NBA DAILY RECAP</h1>
+                <h1>🏀 LE RÉCAP NBA</h1>
                 <p>""" + today + """</p>
             </div>
             
             <div class="content">
                 <div class="section">
-                    <h2>🔥 TONIGHT'S SUMMARY</h2>
+                    <h2>🔥 LA NUIT EN BREF</h2>
                     <div class="summary">
                         """ + summary_html + """
                     </div>
@@ -288,21 +289,21 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     if organized_games:
         html += """
                 <div class="section">
-                    <h2>📊 GAME RESULTS & MATCH DETAILS</h2>
+                    <h2>📊 RÉSULTATS ET DÉTAILS</h2>
                     <div class="scores-list">"""
         
         for game in organized_games:
             html += f"""
                         <div class="score-item">
                             <div class="teams">
-                                🆆 {game['winner']} ({game['winner_record']}) {game['winner_score']} - {game['loser_score']} 🅻 {game['loser']} ({game['loser_record']})
+                                🆆 {game['winner']}{f" ({game['winner_record']})" if game['winner_record'] else ''} {game['winner_score']} - {game['loser_score']} 🅻 {game['loser']}{f" ({game['loser_record']})" if game['loser_record'] else ''}
                             </div>
                             <div class="result" style="margin-top: 8px;">
-                                <strong>Margin:</strong> {game['margin']} points
+                                <strong>Écart :</strong> {game['margin']} points
                             </div>"""
             
             if game['winner_top_performers']:
-                html += "<div style='margin-top: 10px; font-size: 13px; color: #1a5f1a; background: #f0f8f0; padding: 8px; border-radius: 3px;'><strong>🏆 Winner's Top Performers:</strong><br>"
+                html += "<div style='margin-top: 10px; font-size: 13px; color: #1a5f1a; background: #f0f8f0; padding: 8px; border-radius: 3px;'><strong>🏆 Les hommes du match :</strong><br>"
                 for p in game['winner_top_performers']:
                     stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG: {p.get('fg_pct', 0):.0f}%"
                     extras = []
@@ -316,7 +317,7 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                 html += "</div>"
             
             if game['loser_top_performers']:
-                html += "<div style='margin-top: 8px; font-size: 13px; color: #663333; background: #f8f0f0; padding: 8px; border-radius: 3px;'><strong>🔥 Best from Losing Team:</strong><br>"
+                html += "<div style='margin-top: 8px; font-size: 13px; color: #663333; background: #f8f0f0; padding: 8px; border-radius: 3px;'><strong>🔥 Le meilleur côté perdant :</strong><br>"
                 p = game['loser_top_performers'][0]
                 stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG: {p.get('fg_pct', 0):.0f}%"
                 extras = []
@@ -338,7 +339,7 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     elif games:
         html += """
                 <div class="section">
-                    <h2>📊 GAME RESULTS</h2>
+                    <h2>📊 RÉSULTATS</h2>
                     <div class="scores-list">"""
         
         for game in games:
@@ -364,7 +365,7 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     
     html += """
                 <div class="section">
-                    <h2>👑 TOP 5 PERFORMERS OF THE NIGHT</h2>"""
+                    <h2>👑 LE TOP 5 DE LA NUIT</h2>"""
     
     if top_performers:
         seen_names = set()
@@ -382,7 +383,7 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                         <thead>
                             <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
                                 <th style="padding: 12px 10px; text-align: left; font-weight: 600; border: none;">#</th>
-                                <th style="padding: 12px 10px; text-align: left; font-weight: 600; border: none;">PLAYER</th>
+                                <th style="padding: 12px 10px; text-align: left; font-weight: 600; border: none;">JOUEUR</th>
                                 <th style="padding: 12px 10px; text-align: center; font-weight: 600; border: none;">PTS</th>
                                 <th style="padding: 12px 10px; text-align: center; font-weight: 600; border: none;">REB</th>
                                 <th style="padding: 12px 10px; text-align: center; font-weight: 600; border: none;">AST</th>
@@ -434,7 +435,7 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
                     <div style="margin-top: 0; padding: 20px; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border-radius: 8px; text-align: center;">
                         <h2 style="margin: 0 0 15px 0; color: white; font-size: 20px; border: none; padding: 0;">🎬 TOP 10 PLAYS OF THE NIGHT</h2>
                         <a href="{top_10_video['url']}" style="display: inline-block; background: white; color: #ee5a6f; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 15px; margin-top: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            ▶️ Watch Highlights on YouTube
+                            ▶️ Voir le Top 10 sur YouTube
                         </a>
                         <p style="margin: 15px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.95); line-height: 1.5;">{top_10_video['title']}</p>
                     </div>
@@ -448,7 +449,7 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
         html += """
                 
                 <div class="section">
-                    <h2>📰 LATEST NEWS AND HEADLINES</h2>
+                    <h2>📰 LES ACTUS</h2>
                     <ul>"""
         
         for n in news:

@@ -15,7 +15,7 @@ except Exception:
 TRASHTALK_RSS = "https://www.trashtalk.co/feed/"
 ATHLETIC_RSS = "https://www.nytimes.com/athletic/rss/nba/"  # flux NBA (le flux « news » mélange tous les sports)
 DEFAULT_NEWS_SOURCES = (
-    {"name": "Trashtalk", "url": TRASHTALK_RSS, "limit": 3},
+    {"name": "Trashtalk", "url": TRASHTALK_RSS, "limit": 5},
     {"name": "The Athletic", "url": ATHLETIC_RSS, "limit": 5},
 )
 

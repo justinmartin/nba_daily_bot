@@ -2,34 +2,60 @@ name: 🏀 NBA Daily Newsletter
 
 on:
   schedule:
-    # 05:37 UTC = 6 h 37 à Paris en hiver, 7 h 37 en été : les derniers matchs (côte Ouest) sont finis.
-    # Minute « impaire » exprès : à l'heure pile, GitHub retarde les tâches planifiées de plusieurs heures
-    # (le cron de 07:00 partait en réalité entre 11 h et 15 h UTC).
-    - cron: '37 5 * * *'
-  
-  # Allow manual trigger
+    # Objectif : 7 h 45 à Paris toute l'année. GitHub ne connaît que l'UTC et ignore le changement
+    # d'heure, donc deux déclenchements : 05:47 UTC (= 7 h 47 en été) et 06:47 UTC (= 7 h 47 en hiver).
+    # L'étape « Heure de Paris » laisse passer le bon et la marque « déjà envoyé » évite tout doublon.
+    # Minutes « impaires » exprès : à l'heure pile, GitHub retarde les tâches planifiées de plusieurs heures.
+    - cron: '47 5 * * *'
+    - cron: '47 6 * * *'
+
+  # Lancement à la main (toujours envoyé)
   workflow_dispatch:
 
 jobs:
   nba-newsletter:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    
+
     steps:
+      - name: ⏰ Heure de Paris
+        id: gate
+        run: |
+          now=$(TZ=Europe/Paris date +%H%M)
+          echo "today=$(TZ=Europe/Paris date +%F)" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$((10#$now))" -ge 730 ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "Il est $now à Paris : trop tôt, l'autre déclenchement s'en charge."
+          fi
+
+      - name: 🔁 Déjà envoyé aujourd'hui ?
+        id: sent
+        if: steps.gate.outputs.go == 'true' && github.event_name != 'workflow_dispatch'
+        uses: actions/cache/restore@v4
+        with:
+          path: .sent
+          key: nba-sent-${{ steps.gate.outputs.today }}
+
       - name: 📥 Checkout repository
+        if: steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true'
         uses: actions/checkout@v5
-      
+
       - name: 🐍 Setup Python 3.11
+        if: steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true'
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
-      
+
       - name: 📦 Install dependencies
+        if: steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true'
         run: |
           pip install -r requirements.txt
-      
+
       - name: 🚀 Generate and send newsletter
+        if: steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true'
         env:
           MAIL_SMTP_HOST: ${{ secrets.MAIL_SMTP_HOST }}
           MAIL_SMTP_PORT: ${{ secrets.MAIL_SMTP_PORT }}
@@ -48,16 +74,27 @@ jobs:
           CACHE_PATH: ${{ secrets.CACHE_PATH }}
         run: |
           python run.py once
-      
+
+      - name: 📌 Marquer comme envoyé
+        if: success() && steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true' && github.event_name != 'workflow_dispatch'
+        run: mkdir -p .sent && date > .sent/stamp
+
+      - name: 💾 Mémoriser l'envoi du jour
+        if: success() && steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true' && github.event_name != 'workflow_dispatch'
+        uses: actions/cache/save@v4
+        with:
+          path: .sent
+          key: nba-sent-${{ steps.gate.outputs.today }}
+
       - name: 📤 Upload newsletter output
-        if: always()
+        if: always() && steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true'
         uses: actions/upload-artifact@v5
         with:
           name: newsletter
           path: out/
           retention-days: 30
           if-no-files-found: ignore  # Ne pas échouer si aucun fichier (ex: pas de matchs)
-      
+
       - name: 🚨 Alert by email on failure
         if: failure()
         env:

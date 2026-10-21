@@ -49,7 +49,7 @@ def build_prompt(games, news, top_performers):
         margin = abs(g.home_score - g.away_score)
         winner_score = g.away_score if g.away_score > g.home_score else g.home_score
         loser_score = g.home_score if g.away_score > g.home_score else g.away_score
-        wins_desc.append(f"• {winner} demolished {loser} {winner_score}-{loser_score} (margin: {margin} points)")
+        wins_desc.append(f"• {winner} bat {loser} {winner_score}-{loser_score} (écart : {margin} pts)")
     
     wins_text = "\n".join(wins_desc)
     
@@ -77,46 +77,39 @@ def build_prompt(games, news, top_performers):
     
     performers_section = format_performers_for_prompt(organize_game_data(games, top_performers))
     
-    prompt = f""" YOUR ASSIGNMENT:
-You are an NBA journalists, with a style like the French media 'Trashtalk''s journalists can do, write an at least 10 minutes newsletter summary.
-Please, and I insist, only use the information you are provided in the prompt, do not invent any data or facts no information is better than false information. Follow this rule and the following guidelines strictly:
-1. Highlights the biggest upsets and dominant performances, without creating sections/titles whatsoever, without formatting either, only paragraphs.
-2. Roasts the losing teams with little humor.
-3. Hypes up the star performances (the ones provided in the match details, only).
-4. Includes sarcastic commentary on the day's trends.
-5. References at multiple of today's headlines, by reading them carefully.
-6. Uses vivid, entertaining language, staying professional.
-7. NO generic sports clichés or boring phrases, no emojis whatsoever.
-8. Add detailed statistics and data from the games to support your points IF AND ONLY IF you have the data from the games and not old data. I'd rather have no data than false data.
-9. Bounce back on the Headlines and tendencies of the day and in the NBA.
-10. Reference the top performers data provided to add credibility and excitement to your coverage. Use real data from the games, not made-up figures or old ones. I'd rather have no data than false data.
-11. Do not introduce yourself or the newsletter at the beginning, go straight to the point.
-12. Do not write sections or format characters, my goal is to put the text directly in a newsletter that is sent automatically.
-13. Do not put titles or sections in the newsletter, and do not conclude with a sign-off.
-14. ONLY mention players, teams, scores and facts that appear in the DATA below. Never mention a player who is not listed in the data, never state a player's team, age, contract, trade, arena or injury from memory: rosters change every season and your memory is outdated.
-15. Only discuss NBA news; ignore any headline about another sport.
+    prompt = f"""TA MISSION :
+Tu es journaliste NBA, avec le style des rédacteurs de Trashtalk (le média basket français) : drôle, piquant, mais toujours informé. Rédige EN FRANÇAIS le récap de la nuit NBA pour une newsletter du matin.
 
-TONE: Profesional and Sharp, witty and serious, entertaining and factual, you love NBA drama, but you want to inform your readers first.
-STYLE: Mix facts with a bit of personality, be bold and opinionated, but stay professional before all.
-LENGTH: Make it substantial - give readers real insights with entertainment value.
-DATA : 
-TONIGHT'S BIGGEST WINS:
+RÈGLES (à respecter strictement) :
+1. Écris uniquement en français. Les termes basket courants (game-winner, triple-double, clutch, run…) sont permis, comme chez Trashtalk.
+2. N'utilise QUE les informations des DONNÉES ci-dessous. Ne cite jamais un joueur absent des données, n'affirme jamais de mémoire l'équipe, l'âge, le contrat, un transfert, une blessure ou la salle d'un joueur : les effectifs changent chaque saison et ta mémoire est périmée. Mieux vaut ne rien dire que dire faux.
+3. Statistiques : uniquement celles fournies, sans arrondir à ta façon ni en inventer.
+4. Mets en avant les gros cartons, les surprises et les performances individuelles des données ; chambre gentiment les perdants, sans méchanceté.
+5. Reprends 2 ou 3 actus NBA des TITRES DU JOUR quand elles sont liées aux matchs ; ignore tout ce qui ne concerne pas la NBA.
+6. Pas de titres, pas de sections, pas de listes, pas de mise en forme, pas d'emojis : uniquement des paragraphes de texte brut, séparés par une ligne vide.
+7. Pas d'introduction (« Bonjour », « Bienvenue ») ni de signature : entre directement dans le vif.
+8. Longueur : 4 à 6 paragraphes, du plus marquant au plus anecdotique.
+
+TON : vif, imagé, opinions assumées, mais l'info d'abord. Pas de clichés sportifs creux.
+
+DONNÉES :
+PLUS GROS ÉCARTS DE LA NUIT :
 {wins_text}
 
-GAME STATS:
-- Total games: {len(games)}
-- Blowouts (>15 pt margin): {blowouts}
-- Close games (≤5 pt margin): {close_games}
+STATS DE LA SOIRÉE :
+- Matchs : {len(games)}
+- Cartons (écart > 15 pts) : {blowouts}
+- Matchs serrés (écart ≤ 5 pts) : {close_games}
 
-ALL GAMES SUMMARY:
+TOUS LES MATCHS :
 {games_summary_text}
 
 {performers_section}
 
-TODAY'S TOP HEADLINES:
+TITRES DU JOUR :
 {news_headlines}
 
-NOW WRITE:"""
+ÉCRIS LE RÉCAP :"""
     
     return prompt
 
@@ -131,11 +124,11 @@ def organize_game_data(games, all_performers):
         loser_score = game.away_score if is_home_winner else game.home_score
         
         if is_home_winner:
-            winner_record = f"{game.home_wins}-{game.home_losses}" if (game.home_wins and game.home_losses) else "?"
-            loser_record = f"{game.away_wins}-{game.away_losses}" if (game.away_wins and game.away_losses) else "?"
+            winner_record = f"{game.home_wins}-{game.home_losses}" if (game.home_wins is not None and game.home_losses is not None) else ""
+            loser_record = f"{game.away_wins}-{game.away_losses}" if (game.away_wins is not None and game.away_losses is not None) else ""
         else:
-            winner_record = f"{game.away_wins}-{game.away_losses}" if (game.away_wins and game.away_losses) else "?"
-            loser_record = f"{game.home_wins}-{game.home_losses}" if (game.home_wins and game.home_losses) else "?"
+            winner_record = f"{game.away_wins}-{game.away_losses}" if (game.away_wins is not None and game.away_losses is not None) else ""
+            loser_record = f"{game.home_wins}-{game.home_losses}" if (game.home_wins is not None and game.home_losses is not None) else ""
         
         winner_tricode = NAME_TO_TRICODE.get(winner_name, winner_name)
         loser_tricode = NAME_TO_TRICODE.get(loser_name, loser_name)
@@ -309,8 +302,8 @@ def run(dry_run=False):
             # Pas de résumé (plus de crédits, modèle indisponible…) : on envoie quand même scores, stats et news
             logger.error(f"❌ AI summary unavailable, sending the newsletter without it: {e}")
             print(f"::warning::Résumé IA indisponible : {str(e)[:200]}")
-            reason = "no Hugging Face credits left" if "credits" in str(e).lower() else "the AI service did not respond"
-            summary = f"The written recap is unavailable today ({reason}). Scores, top performers and headlines are below."
+            reason = "plus de crédits pour le modèle d'IA" if "credits" in str(e).lower() else "le service d'IA n'a pas répondu"
+            summary = f"Pas de récap rédigé aujourd'hui ({reason}). Les scores, les meilleurs joueurs et les actus sont juste en dessous."
         logger.info(f"📝 Generated summary length: {len(summary) if summary else 0} chars")
         
         if not summary or not summary.strip():
