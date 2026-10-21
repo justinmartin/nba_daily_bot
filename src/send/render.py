@@ -49,9 +49,9 @@ def _render_upcoming_games(upcoming_games) -> str:
                         <div class="score-item" style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;">
                             <div style="flex:1; min-width:200px;">
                                 <div style="font-weight:700; font-size:15px; color:#1a1a1a;">
-                                    {g.away_team} <span style="color:#999; font-size:12px;">({g.away_record})</span>
+                                    {g.away_team} {f'<span style="color:#999; font-size:12px;">({g.away_record})</span>' if g.away_record else ''}
                                     &nbsp;@&nbsp;
-                                    {g.home_team} <span style="color:#999; font-size:12px;">({g.home_record})</span>
+                                    {g.home_team} {f'<span style="color:#999; font-size:12px;">({g.home_record})</span>' if g.home_record else ''}
                                 </div>
                                 <div style="margin-top:6px; font-size:13px; color:#667eea; font-weight:600;">
                                     🕐 {g.game_time_fr}
@@ -91,7 +91,11 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
     if upcoming_games is None:
         upcoming_games = []
     
-    today = datetime.now().strftime("%A, %B %d %Y")
+    # Le récap porte sur la nuit précédente : « Night of May 5 → 6 »
+    from datetime import timedelta
+    _now = datetime.now()
+    _prev = _now - timedelta(days=1)
+    today = f"Night of {_prev.strftime('%B %d')} → {_now.strftime('%B %d, %Y')}"
     # Escape model output so accidental HTML does not break the newsletter layout.
     summary_html = escape(summary_text).replace("\n", "<br>")
     

@@ -16,7 +16,7 @@ def _build_payload(model_id: str, prompt: str, max_tokens: int = None):
         ],
         "model": model_id,
         "max_tokens": max_tokens or cfg.MAX_TOKENS,
-        "temperature": 0.8,
+        "temperature": 0.7,
         "top_p": 0.95,
     }
 
@@ -30,8 +30,11 @@ def _post_chat_completion(requests_module, api_url: str, headers: dict, payload:
         except Exception:
             error_json = {}
 
-        error_message = error_json.get("error", {}).get("message", "")
-        error_code = error_json.get("error", {}).get("code", "")
+        err = error_json.get("error", {}) if isinstance(error_json, dict) else {}
+        if isinstance(err, str):  # ex. {"error": "You have no remaining credits…"}
+            err = {"message": err, "code": ""}
+        error_message = err.get("message", "")
+        error_code = err.get("code", "")
         raise requests_module.HTTPError(
             f"HF API {response.status_code} ({error_code}): {error_message or body_preview}",
             response=response,
@@ -55,7 +58,7 @@ def _extract_safe_max_tokens(error_message: str):
     return safe_budget
 
 
-def generate_with_hf_openai_api(prompt: str, max_tokens: int = None):
+def generate_with_hf_openai_api(prompt: str, max_tokens: int = None, model_id: str = None):
     try:
         import requests
     except ImportError:
@@ -67,12 +70,12 @@ def generate_with_hf_openai_api(prompt: str, max_tokens: int = None):
         raise ValueError("❌ HF_API_TOKEN not configured in environment")
     
     try:
-        logger.info(f"🤖 Using HF OpenAI API with model {cfg.MODEL_ID}")
+        model_id = model_id or cfg.MODEL_ID
+        logger.info(f"🤖 Using HF OpenAI API with model {model_id}")
         
         api_url = "https://router.huggingface.co/v1/chat/completions"
         headers = {"Authorization": f"Bearer {token}"}
 
-        model_id = cfg.MODEL_ID
         payload = _build_payload(model_id=model_id, prompt=prompt, max_tokens=max_tokens)
 
         try:
@@ -86,8 +89,11 @@ def generate_with_hf_openai_api(prompt: str, max_tokens: int = None):
                 except Exception:
                     error_json = {}
 
-            error_code = error_json.get("error", {}).get("code", "")
-            error_message = error_json.get("error", {}).get("message", "")
+            err = error_json.get("error", {}) if isinstance(error_json, dict) else {}
+            if isinstance(err, str):
+                err = {"message": err, "code": ""}
+            error_code = err.get("code", "")
+            error_message = err.get("message", "")
             should_retry_with_provider = (
                 status_code == 400
                 and error_code in {"model_not_supported", "model_not_found"}
@@ -184,12 +190,18 @@ def generate(prompt: str, max_tokens: int = None):
     if not prompt or not prompt.strip():
         raise ValueError("❌ Prompt cannot be empty")
     
-    try:
-        if cfg.USE_HF_INF_API:
-            return generate_with_hf_openai_api(prompt, max_tokens=max_tokens)
-        else:
-            return generate_local(prompt, max_tokens=max_tokens)
-            
-    except Exception as e:
-        logger.error(f"❌ Text generation failed: {e}")
-        raise
+    if not cfg.USE_HF_INF_API:
+        return generate_local(prompt, max_tokens=max_tokens)
+
+    # Modèle principal puis modèles de secours (MODEL_FALLBACKS) si le premier est indisponible
+    models = [cfg.MODEL_ID] + [m for m in cfg.MODEL_FALLBACKS if m and m != cfg.MODEL_ID]
+    last_error = None
+    for model_id in models:
+        try:
+            return generate_with_hf_openai_api(prompt, max_tokens=max_tokens, model_id=model_id)
+        except Exception as e:
+            last_error = e
+            logger.error(f"❌ Text generation failed with {model_id}: {e}")
+            if "remaining credits" in str(e).lower() or "402" in str(e):
+                break  # plus de crédits Hugging Face : inutile d'essayer un autre modèle
+    raise last_error

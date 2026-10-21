@@ -93,6 +93,8 @@ Please, and I insist, only use the information you are provided in the prompt, d
 11. Do not introduce yourself or the newsletter at the beginning, go straight to the point.
 12. Do not write sections or format characters, my goal is to put the text directly in a newsletter that is sent automatically.
 13. Do not put titles or sections in the newsletter, and do not conclude with a sign-off.
+14. ONLY mention players, teams, scores and facts that appear in the DATA below. Never mention a player who is not listed in the data, never state a player's team, age, contract, trade, arena or injury from memory: rosters change every season and your memory is outdated.
+15. Only discuss NBA news; ignore any headline about another sport.
 
 TONE: Profesional and Sharp, witty and serious, entertaining and factual, you love NBA drama, but you want to inform your readers first.
 STYLE: Mix facts with a bit of personality, be bold and opinionated, but stay professional before all.
@@ -301,7 +303,14 @@ def run(dry_run=False):
         prompt = build_prompt(games, news, all_top_performers)
         logger.debug(f"Prompt preview: {prompt[:300]}...")
         
-        summary = generate(prompt, max_tokens=cfg.MAX_TOKENS)
+        try:
+            summary = generate(prompt, max_tokens=cfg.MAX_TOKENS)
+        except Exception as e:
+            # Pas de résumé (plus de crédits, modèle indisponible…) : on envoie quand même scores, stats et news
+            logger.error(f"❌ AI summary unavailable, sending the newsletter without it: {e}")
+            print(f"::warning::Résumé IA indisponible : {str(e)[:200]}")
+            reason = "no Hugging Face credits left" if "credits" in str(e).lower() else "the AI service did not respond"
+            summary = f"The written recap is unavailable today ({reason}). Scores, top performers and headlines are below."
         logger.info(f"📝 Generated summary length: {len(summary) if summary else 0} chars")
         
         if not summary or not summary.strip():

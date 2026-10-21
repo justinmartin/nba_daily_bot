@@ -15,7 +15,9 @@ class Config:
     USE_HF_INF_API = os.getenv("USE_HF_INF_API", "false").lower() == "true"
     HF_API_TOKEN = os.getenv("HF_API_TOKEN")
     # HF Router chat/completions often requires provider suffix (ex: :featherless-ai)
-    MODEL_ID = os.getenv("MODEL_ID", "mistralai/Mistral-7B-Instruct-v0.2:featherless-ai")
+    MODEL_ID = os.getenv("MODEL_ID") or "moonshotai/Kimi-K3"
+    # Modèles de secours, séparés par des virgules
+    MODEL_FALLBACKS = [m.strip() for m in (os.getenv("MODEL_FALLBACKS") or "deepseek-ai/DeepSeek-V4.1-Flash,zai-org/GLM-5.3").split(",")]
     HF_PROVIDER = os.getenv("HF_PROVIDER", "featherless-ai")
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", 400))
     
