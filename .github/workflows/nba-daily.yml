@@ -2,33 +2,47 @@ name: 🏀 NBA Daily Newsletter
 
 on:
   schedule:
-    # Objectif : 7 h 45 à Paris toute l'année. GitHub ne connaît que l'UTC et ignore le changement
-    # d'heure, donc deux déclenchements : 05:47 UTC (= 7 h 47 en été) et 06:47 UTC (= 7 h 47 en hiver).
-    # L'étape « Heure de Paris » laisse passer le bon et la marque « déjà envoyé » évite tout doublon.
-    # Minutes « impaires » exprès : à l'heure pile, GitHub retarde les tâches planifiées de plusieurs heures.
-    - cron: '47 5 * * *'
-    - cron: '47 6 * * *'
+    # Objectif : mail à 7 h 45 à Paris. Les tâches planifiées de GitHub partent avec plusieurs heures de retard
+    # (4 à 6 h constatées le matin), donc on en lance une par heure à partir de la veille au soir : la première
+    # qui démarre moins de 5 h 40 avant l'envoi attend 7 h 40, prépare le récap et l'envoie. Les suivantes voient
+    # « déjà envoyé » et s'arrêtent en quelques secondes. Été comme hiver (l'heure de Paris est calculée).
+    - cron: '23 20-23 * * *'
+    - cron: '23 0-6 * * *'
 
-  # Lancement à la main (toujours envoyé)
+  # Lancement à la main (envoi immédiat)
   workflow_dispatch:
+
+# Un seul run à la fois : celui qui attend garde la main, le suivant passe après et voit « déjà envoyé ».
+concurrency:
+  group: nba-daily
+  cancel-in-progress: false
 
 jobs:
   nba-newsletter:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 355
 
     steps:
-      - name: ⏰ Heure de Paris
+      - name: ⏰ Attendre 7 h 40 à Paris
         id: gate
         run: |
-          now=$(TZ=Europe/Paris date +%H%M)
-          echo "today=$(TZ=Europe/Paris date +%F)" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$((10#$now))" -ge 730 ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "go=true" >> "$GITHUB_OUTPUT"
           else
-            echo "go=false" >> "$GITHUB_OUTPUT"
-            echo "Il est $now à Paris : trop tôt, l'autre déclenchement s'en charge."
+            now=$(date +%s)
+            # Démarré le soir (après 18 h à Paris) : l'envoi visé est celui du lendemain matin
+            if [ "$(TZ=Europe/Paris date +%-H)" -ge 18 ]; then day=tomorrow; else day=today; fi
+            target=$(TZ=Europe/Paris date -d "$day 07:40" +%s)
+            wait=$((target - now))
+            if [ "$wait" -gt 20400 ]; then
+              echo "Trop tôt ($((wait / 60)) min avant l'envoi) : un déclenchement suivant s'en chargera."
+              echo "go=false" >> "$GITHUB_OUTPUT"
+            else
+              if [ "$wait" -gt 0 ]; then echo "Attente de $((wait / 60)) min…"; sleep "$wait"; fi
+              echo "go=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
+          echo "today=$(TZ=Europe/Paris date +%F)" >> "$GITHUB_OUTPUT"
 
       - name: 🔁 Déjà envoyé aujourd'hui ?
         id: sent
@@ -71,7 +85,6 @@ jobs:
           CLAUDE_MODEL: claude-sonnet-5-5
           USE_HF_INF_API: ${{ secrets.USE_HF_INF_API }}
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
-          # Modèle principal puis secours (HF Inference Providers)
           MODEL_ID: moonshotai/Kimi-K3
           MODEL_FALLBACKS: deepseek-ai/DeepSeek-V4.1-Flash,zai-org/GLM-5.3
           MAX_TOKENS: ${{ secrets.MAX_TOKENS }}
@@ -107,10 +120,13 @@ jobs:
           MAIL_SMTP_USER: ${{ secrets.MAIL_SMTP_USER }}
           MAIL_SMTP_PASSWORD: ${{ secrets.MAIL_SMTP_PASSWORD }}
           NEWS_RECIPIENT: ${{ secrets.NEWS_RECIPIENT }}
-        run: python .github/scripts/notify_failure.py
+        run: |
+          [ -f .github/scripts/notify_failure.py ] || git clone --depth 1 "https://github.com/${{ github.repository }}" .
+          python .github/scripts/notify_failure.py
 
-  # Empêche GitHub de désactiver ce workflow après 60 jours sans commit
+  # Empêche GitHub de désactiver ce workflow après 60 jours sans commit (une fois par jour suffit)
   keepalive:
+    if: github.event.schedule == '23 20-23 * * *'
     runs-on: ubuntu-latest
     permissions:
       actions: write

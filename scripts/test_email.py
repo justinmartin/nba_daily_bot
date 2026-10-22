@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Test script pour vérifier l'envoi d'email."""
+"""Test script pour vérifier l'envoi d'email (python scripts/test_email.py)."""
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import Config
 from src.send.mailer import send_mail
