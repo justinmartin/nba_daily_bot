@@ -2,17 +2,21 @@ name: 🏀 NBA Daily Newsletter
 
 on:
   schedule:
-    # Objectif : mail à 7 h 45 à Paris. Les tâches planifiées de GitHub partent avec plusieurs heures de retard
-    # (4 à 6 h constatées le matin), donc on en lance une par heure à partir de la veille au soir : la première
-    # qui démarre moins de 5 h 40 avant l'envoi attend 7 h 40, prépare le récap et l'envoie. Les suivantes voient
-    # « déjà envoyé » et s'arrêtent en quelques secondes. Été comme hiver (l'heure de Paris est calculée).
-    - cron: '23 20-23 * * *'
+    # Objectif : mail à 7 h 45 à Paris. Les tâches planifiées de GitHub partent avec des heures de retard le matin
+    # (4 à 6 h constatées), mais à l'heure le soir. Le run du soir attend donc sur place (5 h 40 au plus, un run
+    # GitHub est limité à 6 h), puis se relance lui-même (« relais » : un lancement manuel démarre tout de suite)
+    # jusqu'à 7 h 40, prépare le récap et l'envoie. Les déclenchements du matin servent de filet de sécurité.
+    - cron: '23 19-23 * * *'
     - cron: '23 0-6 * * *'
 
-  # Lancement à la main (envoi immédiat)
   workflow_dispatch:
+    inputs:
+      relay:
+        description: "Relais automatique (attendre 7 h 40). Laisser décoché pour envoyer tout de suite."
+        type: boolean
+        default: false
 
-# Un seul run à la fois : celui qui attend garde la main, le suivant passe après et voit « déjà envoyé ».
+# Un seul run à la fois : celui qui attend garde la main, les suivants passent après et voient « déjà envoyé ».
 concurrency:
   group: nba-daily
   cancel-in-progress: false
@@ -21,32 +25,65 @@ jobs:
   nba-newsletter:
     runs-on: ubuntu-latest
     timeout-minutes: 355
+    permissions:
+      actions: write   # pour se relancer (relais)
+      contents: read
 
     steps:
+      - name: 📅 Date du jour à Paris
+        id: day
+        run: echo "today=$(TZ=Europe/Paris date +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: 🔁 Récap du jour déjà envoyé ?
+        id: sent_today
+        uses: actions/cache/restore@v4
+        with:
+          path: .sent
+          key: nba-sent-${{ steps.day.outputs.today }}
+          lookup-only: true
+
       - name: ⏰ Attendre 7 h 40 à Paris
         id: gate
+        env:
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' && !inputs.relay }}
+          SENT_TODAY: ${{ steps.sent_today.outputs.cache-hit == 'true' }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "go=true" >> "$GITHUB_OUTPUT"
+          go=false; relay=false
+          if [ "$MANUAL" = "true" ]; then
+            go=true
           else
             now=$(date +%s)
-            # Démarré le soir (après 18 h à Paris) : l'envoi visé est celui du lendemain matin
-            if [ "$(TZ=Europe/Paris date +%-H)" -ge 18 ]; then day=tomorrow; else day=today; fi
-            target=$(TZ=Europe/Paris date -d "$day 07:40" +%s)
+            today740=$(TZ=Europe/Paris date -d "today 07:40" +%s)
+            if [ "$now" -lt "$today740" ]; then target=$today740
+            elif [ "$SENT_TODAY" != "true" ]; then target=$now            # en retard et pas encore envoyé : tout de suite
+            else target=$(TZ=Europe/Paris date -d "tomorrow 07:40" +%s)
+            fi
             wait=$((target - now))
-            if [ "$wait" -gt 20400 ]; then
-              echo "Trop tôt ($((wait / 60)) min avant l'envoi) : un déclenchement suivant s'en chargera."
-              echo "go=false" >> "$GITHUB_OUTPUT"
-            else
+            if [ "$wait" -gt 43200 ]; then
+              echo "Envoi dans plus de 12 h : rien à faire, les déclenchements du soir s'en chargeront."
+            elif [ "$wait" -le 20400 ]; then
               if [ "$wait" -gt 0 ]; then echo "Attente de $((wait / 60)) min…"; sleep "$wait"; fi
-              echo "go=true" >> "$GITHUB_OUTPUT"
+              go=true
+            else
+              nap=$((wait - 20000)); [ "$nap" -gt 20400 ] && nap=20400
+              echo "Envoi dans $((wait / 60)) min : attente de $((nap / 60)) min puis relais."
+              sleep "$nap"
+              relay=true
             fi
           fi
+          echo "go=$go" >> "$GITHUB_OUTPUT"
+          echo "relay=$relay" >> "$GITHUB_OUTPUT"
           echo "today=$(TZ=Europe/Paris date +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: 🔂 Relais
+        if: steps.gate.outputs.relay == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nba-daily.yml --repo "${{ github.repository }}" -f relay=true
 
       - name: 🔁 Déjà envoyé aujourd'hui ?
         id: sent
-        if: steps.gate.outputs.go == 'true' && github.event_name != 'workflow_dispatch'
+        if: steps.gate.outputs.go == 'true' && !(github.event_name == 'workflow_dispatch' && !inputs.relay)
         uses: actions/cache/restore@v4
         with:
           path: .sent
@@ -93,11 +130,11 @@ jobs:
           python run.py once
 
       - name: 📌 Marquer comme envoyé
-        if: success() && steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true' && github.event_name != 'workflow_dispatch'
+        if: success() && steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true'
         run: mkdir -p .sent && date > .sent/stamp
 
       - name: 💾 Mémoriser l'envoi du jour
-        if: success() && steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true' && github.event_name != 'workflow_dispatch'
+        if: success() && steps.gate.outputs.go == 'true' && steps.sent.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: .sent
@@ -124,9 +161,9 @@ jobs:
           [ -f .github/scripts/notify_failure.py ] || git clone --depth 1 "https://github.com/${{ github.repository }}" .
           python .github/scripts/notify_failure.py
 
-  # Empêche GitHub de désactiver ce workflow après 60 jours sans commit (une fois par jour suffit)
+  # Empêche GitHub de désactiver ce workflow après 60 jours sans commit
   keepalive:
-    if: github.event.schedule == '23 20-23 * * *'
+    if: github.event.schedule == '23 19-23 * * *'
     runs-on: ubuntu-latest
     permissions:
       actions: write

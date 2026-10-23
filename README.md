@@ -17,10 +17,11 @@ Si l'IA ne répond pas, le mail part quand même, avec un court résumé de repl
 
 Tout passe par GitHub Actions (`.github/workflows/nba-daily.yml`) :
 
-- Les tâches planifiées de GitHub partent souvent avec **4 à 6 h de retard**. Le workflow est donc lancé toutes les heures depuis la veille au soir (`23 20-23` et `23 0-6`, en UTC). Le premier run qui démarre moins de 5 h 40 avant l'envoi **attend 7 h 40 à Paris**, prépare le récap puis l'envoie.
-- Un seul run à la fois (`concurrency`). Une marque « déjà envoyé » (`actions/cache`, une clé par jour) arrête les suivants en quelques secondes.
+- Les tâches planifiées de GitHub partent avec **des heures de retard le matin** (4 à 6 h constatées), mais à peu près à l'heure le soir. Le workflow se déclenche donc toutes les heures en soirée (`23 19-23`, UTC). Le premier run **attend sur place** (5 h 40 au plus, un run GitHub étant limité à 6 h), puis **se relance lui-même** : un « relais » lancé par l'API démarre tout de suite, contrairement à une tâche planifiée. La chaîne continue jusqu'à **7 h 40 à Paris**, puis le récap est préparé et envoyé.
+- Les déclenchements du matin (`23 0-6`) servent de filet de sécurité : si rien n'est parti à 7 h 40, le premier qui démarre envoie tout de suite.
+- Un seul run à la fois (`concurrency`). Une marque « déjà envoyé » (`actions/cache`, une clé par jour) arrête les doublons en quelques secondes.
 - L'heure de Paris est calculée à chaque run, ce qui gère tout seul le passage à l'heure d'été ou d'hiver.
-- Un lancement à la main (Actions → NBA Daily Newsletter → Run workflow) envoie le mail **tout de suite**.
+- Un lancement à la main (Actions → NBA Daily Newsletter → Run workflow, case « relais » décochée) envoie le mail **tout de suite**.
 - En cas d'échec, un mail d'alerte part aux destinataires (`.github/scripts/notify_failure.py`).
 - Un job `keepalive` empêche GitHub de désactiver le workflow après 60 jours sans commit.
 
