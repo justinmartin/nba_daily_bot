@@ -5,13 +5,24 @@ Le récap NBA de la nuit, en français, dans ta boîte mail chaque matin vers 7 
 ## Ce qu'il y a dans le mail
 
 - **La nuit en bref** : un résumé rédigé par Claude, en français, façon Trashtalk, à partir des seuls résultats et actus du jour (aucun joueur ni chiffre inventé).
-- **Les résultats** : scores, bilans des équipes, écarts.
-- **Les hommes du match** : les meilleurs joueurs de chaque rencontre.
+- **Le tableau des scores** en haut du mail : chaque score renvoie à la carte du match.
+- **La perf de la nuit** : le meilleur marqueur, sur une carte aux couleurs de son équipe.
+- **Une carte par match** :
+  - aux couleurs du vainqueur, avec les logos en filigrane, dans l'ordre extérieur / domicile ;
+  - le bouton **Résumé Trashtalk** si l'article est paru, sinon **Résumé ESPN** ;
+  - la **vidéo** officielle de la NBA sur YouTube (résumé complet, sinon un extrait), avec sa miniature ;
+  - les deux meilleurs joueurs du vainqueur et le meilleur du perdant.
 - **Le Top 5 de la nuit** et le lien vers le **Top 10 officiel** sur YouTube.
 - **Ce soir** : le programme de la nuit suivante avec les diffuseurs français.
 - **Les actus** : Trashtalk et le flux NBA de The Athletic.
 
 Si l'IA ne répond pas, le mail part quand même, avec un court résumé de repli.
+
+### Le rendu
+
+- Design sombre « courtside », pensé pour le téléphone (452 px de large), en tableaux et styles en ligne pour les messageries.
+- La perf de la nuit et le haut de chaque carte de match sont **dessinés en image** (`src/send/perf_card.py`, Pillow, polices Oswald et Inter dans `assets/fonts`). Ils sont joints au mail (images `cid:`), donc s'affichent pareil partout. Si une image ne peut pas être dessinée, le mail reprend la version HTML.
+- **Outlook en mode sombre** repeint les fonds HTML en gris, quoi que contienne le mail ; seules les images y échappent. Pour voir le vrai fond, il faut afficher le message en clair dans Outlook (icône soleil du message, ou réglage d'apparence « fond sombre pour les messages » désactivé).
 
 ## Comment ça tourne
 
@@ -39,7 +50,9 @@ Ordre d'essai (`src/model/hf_client.py`) :
 |---|---|
 | Scores, bilans, joueurs | API publique d'ESPN (`site.api.espn.com`) |
 | Programme et diffuseurs FR | nba.com/games |
-| Top 10 | chaîne YouTube officielle de la NBA (flux RSS) |
+| Top 10 et vidéos des matchs | chaîne YouTube officielle de la NBA (page « Vidéos » et flux RSS) |
+| Logos et couleurs des équipes | API d'ESPN |
+| Résumés des matchs | Trashtalk (RSS), sinon page « recap » d'ESPN |
 | Actus | Trashtalk (RSS) et The Athletic, flux NBA |
 
 ## Secrets GitHub
@@ -70,10 +83,12 @@ Pour la rédaction par Claude en local, il faut Claude Code installé et connect
 ```
 src/
 ├── fetch/      scores.py, players.py (ESPN) · schedule.py (programme + diffuseurs) · news.py · youtube.py
+│               extras.py : logos, résumés Trashtalk / ESPN, vidéos des matchs
 ├── model/      hf_client.py : Claude Code, puis Hugging Face
-├── send/       render.py (mail HTML) · mailer.py (SMTP)
+├── send/       render.py (mail HTML) · perf_card.py (images) · mailer.py (SMTP, images jointes)
 ├── config.py   variables d'environnement
 └── main.py     orchestration et prompt
+assets/fonts/   Oswald et Inter (licence OFL)
 run.py          point d'entrée (test | once | schedule)
 scripts/        test_email.py
 ```

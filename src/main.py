@@ -11,7 +11,9 @@ from src.send.mailer import send_mail
 from src.fetch.players import get_top_performers
 from src.fetch.news import fetch_news
 from src.fetch.youtube import get_top_10_plays_video
-from src.send.render import render_email
+from src.send.render import render_email, perf_details
+from src.send.perf_card import perf_card_png, match_header_png
+from src.fetch import extras
 
 logging.basicConfig(
     level=logging.INFO,
@@ -145,9 +147,15 @@ def organize_game_data(games, all_performers):
                 loser_perf_dict[p['name']] = p
         loser_performers = sorted(loser_perf_dict.values(), key=lambda x: x.get('pts', 0), reverse=True)[:1]
         
+        home_record = f"{game.home_wins}-{game.home_losses}" if (game.home_wins is not None and game.home_losses is not None) else ""
+        away_record = f"{game.away_wins}-{game.away_losses}" if (game.away_wins is not None and game.away_losses is not None) else ""
         game_data = {
             "id": game.id,
             "date": game.date,
+            # L'affiche telle qu'elle est : extérieur à gauche, domicile à droite
+            "away": game.away_team, "home": game.home_team,
+            "away_score": game.away_score, "home_score": game.home_score,
+            "away_record": away_record, "home_record": home_record,
             "winner": winner_name,
             "loser": loser_name,
             "winner_score": winner_score,
@@ -227,7 +235,7 @@ def send_schedule_only(target, dry_run=False):
         f"Pas de match cette nuit. {len(upcoming)} match(s) au programme ce soir : "
         "retrouvez les horaires et diffuseurs ci-dessous, ainsi que les dernières news."
     )
-    html = render_email(summary, news, upcoming_games=upcoming)
+    html = render_email(summary, news, upcoming_games=upcoming, teams=extras.get_teams())
 
     os.makedirs("out", exist_ok=True)
     output_file = f"out/newsletter_{target}_schedule.html"
@@ -309,19 +317,61 @@ def run(dry_run=False):
         if not summary or not summary.strip():
             logger.warning(f"⚠️ Summary is empty or whitespace: {repr(summary[:100] if summary else 'None')}")
         
+        # Habillage des matchs : logos et couleurs, résumé Trashtalk (sinon ESPN), vidéo YouTube de la NBA
+        logger.info("🎬 Fetching recaps, videos and team colors...")
+        teams = extras.get_teams()
+        tt = extras.night_items(extras.trashtalk_items(30), game_date_obj)
+        links = {}
+        for g in organized_games:
+            url = extras.trashtalk_for_game(tt, g['winner'], g['loser'], g['winner_score'], g['loser_score'])
+            links[g['id']] = {'kind': 'trashtalk', 'url': url} if url else {'kind': 'espn', 'url': extras.espn_recap(g['id'])}
+        try:
+            videos, nightly_video = extras.highlight_videos(games, game_date_obj)
+        except Exception as e:
+            logger.warning(f"⚠️ Videos unavailable: {e}")
+            videos, nightly_video = {}, None
+
+        # La perf de la nuit, dessinée en image (logo en filigrane, rendu identique dans toutes les messageries)
+        perf_png = None
+        if all_top_performers:
+            best = max(all_top_performers, key=lambda p: p.get('pts', 0))
+            t = teams.get(best.get('team')) or {}
+            if t:
+                perf_png = perf_card_png(best.get('name', ''), perf_details(best), int(best.get('pts', 0)), t['color'], t['abbr'])
+
+        # Le haut de chaque carte de match, dessiné en image (logos en filigrane)
+        images = {"perf": perf_png} if perf_png else {}
+        for i, g in enumerate(organized_games):
+            ta, th = teams.get(g['away']), teams.get(g['home'])
+            if ta and th:
+                png = match_header_png({**ta, 'name': g['away'], 'record': g.get('away_record'), 'score': g['away_score']},
+                                       {**th, 'name': g['home'], 'record': g.get('home_record'), 'score': g['home_score']})
+                if png:
+                    images[f"m{i}"] = png
+        header_imgs = {g['id']: f"cid:m{i}" for i, g in enumerate(organized_games) if f"m{i}" in images}
+
         logger.info("🎨 Rendering newsletter HTML...")
-        html = render_email(summary, news, all_top_performers, games, organized_games, top_10_video, upcoming)
+        html = render_email(summary, news, all_top_performers, games, organized_games, top_10_video, upcoming,
+                            teams=teams, links=links, videos=videos, nightly_video=nightly_video, tt_nightly=extras.trashtalk_nightly(tt),
+                            perf_img="cid:perf" if perf_png else None, header_imgs=header_imgs)
         
         os.makedirs("out", exist_ok=True)  # Crée le dossier out/ si inexistant
         output_file = f"out/newsletter_{target}.html"
         with open(output_file, "w", encoding="utf-8") as f:
-            f.write(html)
+            # Aperçu local : les images à côté du fichier
+            preview = html
+            for cid in images:
+                preview = preview.replace(f'"cid:{cid}"', f'"{cid}_{target}.png"')
+            f.write(preview)
+        for cid, png in images.items():
+            with open(f"out/{cid}_{target}.png", "wb") as f:
+                f.write(png)
         logger.info(f"✅ Newsletter saved to {output_file}")
         
         if not dry_run:
             try:
                 logger.info("📧 Sending email...")
-                send_mail(html, f"NBA Daily — {target}")
+                send_mail(html, f"NBA Daily — {target}", images=images or None)
                 logger.info(f"✅ Email sent to {cfg.NEWS_RECIPIENT}")
             except Exception as e:
                 logger.error(f"❌ Failed to send email: {e}")

@@ -219,7 +219,8 @@ def generate(prompt: str, max_tokens: int = None):
         raise ValueError("❌ Prompt cannot be empty")
 
     # Claude (abonnement) en priorité, puis Hugging Face en secours
-    if cfg.CLAUDE_CODE_OAUTH_TOKEN:
+    # En local, USE_CLAUDE_CODE=1 utilise la session Claude Code du Mac (sans jeton)
+    if cfg.CLAUDE_CODE_OAUTH_TOKEN or os.getenv("USE_CLAUDE_CODE") == "1":
         try:
             return generate_with_claude_code(prompt)
         except Exception as e:

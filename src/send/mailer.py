@@ -3,12 +3,14 @@ import smtplib
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 from src.config import Config
 
 logger = logging.getLogger(__name__)
 cfg = Config()
 
-def send_mail(html_body: str, subject: str):
+def send_mail(html_body: str, subject: str, images=None):
+    """images : { content-id : octets PNG }, référencées dans le HTML par src=\"cid:<id>\"."""
     if not cfg.MAIL_SMTP_HOST or not cfg.MAIL_SMTP_USER or not cfg.MAIL_SMTP_PASSWORD:
         raise ValueError("❌ SMTP configuration incomplete: MAIL_SMTP_HOST, MAIL_SMTP_USER, or MAIL_SMTP_PASSWORD missing")
     
@@ -21,12 +23,23 @@ def send_mail(html_body: str, subject: str):
     try:
         recipients = [email.strip() for email in cfg.NEWS_RECIPIENT.split(",") if email.strip()]
         
-        msg = MIMEMultipart("alternative")  # "alternative" = supporte HTML + texte brut
+        # « related » quand le mail embarque des images (cid:…), sinon « alternative »
+        msg = MIMEMultipart("related" if images else "alternative")
         msg["Subject"] = subject
         msg["From"] = cfg.MAIL_SMTP_USER
         msg["To"] = ", ".join(recipients)  # Affiche tous les destinataires dans l'en-tête
-        
-        msg.attach(MIMEText(html_body, "html"))
+
+        if images:
+            alt = MIMEMultipart("alternative")
+            alt.attach(MIMEText(html_body, "html"))
+            msg.attach(alt)
+            for cid, data in images.items():
+                part = MIMEImage(data, "png")
+                part.add_header("Content-ID", f"<{cid}>")
+                part.add_header("Content-Disposition", "inline", filename=f"{cid}.png")
+                msg.attach(part)
+        else:
+            msg.attach(MIMEText(html_body, "html"))
 
         logger.info(f"Connecting to SMTP server {cfg.MAIL_SMTP_HOST}:{cfg.MAIL_SMTP_PORT}")
         s = smtplib.SMTP(cfg.MAIL_SMTP_HOST, cfg.MAIL_SMTP_PORT)
