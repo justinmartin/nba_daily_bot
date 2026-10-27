@@ -327,7 +327,6 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
         <td style="font-family:{DISPLAY};font-weight:700;font-size:34px;line-height:1;color:{TEXT};letter-spacing:0.5px">LE RÉCAP <span style="color:{ACCENT}">NBA</span>
           <div style="font-family:{SANS};font-weight:400;font-size:13px;color:{TEXT3};letter-spacing:0;margin-top:6px">{_e(sub)}</div></td>
-        <td align="right" valign="top" width="44"><span style="display:inline-block;width:40px;height:40px;border-radius:20px;background:{ACCENT};text-align:center;line-height:40px;font-size:22px">🏀</span></td>
       </tr></table></td></tr>'''
 
     if organized_games:
