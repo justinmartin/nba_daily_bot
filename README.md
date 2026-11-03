@@ -42,7 +42,7 @@ La perf de la nuit, le Top 5 et les joueurs de chaque carte sont triés au **Gam
 
 ## Rédaction du résumé
 
-Claude reçoit, pour chaque match, les box scores (dont le +/-), les absents et le récit d'ESPN, plus les articles des 30 dernières heures (`src/fetch/articles.py`) : Trashtalk (articles entiers), Basket USA, Yahoo Sports, Hoops Rumors, RealGM, CBS Sports et The Athletic (titre et résumé du flux public seulement, le site est payant).
+Claude reçoit, pour chaque match, les box scores (dont le +/-), les absents et le récit d'ESPN, plus les articles parus pendant la nuit, à partir de 22 h UTC (`src/fetch/articles.py`) : Trashtalk (articles entiers), Basket USA, Yahoo Sports, Hoops Rumors, RealGM, CBS Sports et The Athletic (titre et résumé du flux public seulement, le site est payant).
 
 Ordre d'essai (`src/model/hf_client.py`) :
 

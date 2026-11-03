@@ -52,9 +52,15 @@ def _entry_text(entry):
     return _clean(content if len(content) > len(summary) else summary)
 
 
-def fetch_articles(hours=30, now=None):
-    """Les articles NBA des dernières heures, source par source : [{source, title, link, published, text}]."""
-    since = (now or datetime.now(timezone.utc)) - timedelta(hours=hours)
+def night_window(game_date):
+    """La nuit NBA : de 22 h UTC le jour des matchs (avant le premier match) à midi UTC le lendemain."""
+    start = datetime(game_date.year, game_date.month, game_date.day, 22, tzinfo=timezone.utc)
+    return start, start + timedelta(hours=14)
+
+
+def fetch_articles(game_date):
+    """Les articles NBA parus pendant la nuit, source par source : [{source, title, link, published, text}]."""
+    since, until = night_window(game_date)
     articles = []
     for source, url, limit, length, full in SOURCES:
         try:
@@ -71,7 +77,7 @@ def fetch_articles(hours=30, now=None):
             parsed = entry.get("published_parsed") or entry.get("updated_parsed")
             published = datetime.fromtimestamp(timegm(parsed), timezone.utc) if parsed else None
             title = _clean(entry.get("title", ""))
-            if not title or not published or published < since or BETTING.search(title):
+            if not title or not published or not since <= published <= until or BETTING.search(title):
                 continue
             text = (_full_page(entry.get("link")) if full else "") or _entry_text(entry)
             articles.append({"source": source, "title": title, "link": entry.get("link", ""),

@@ -10,7 +10,7 @@ import os
 from src.send.mailer import send_mail
 from src.fetch.players import get_night, rank
 from src.fetch.news import fetch_news
-from src.fetch.articles import fetch_articles
+from src.fetch.articles import fetch_articles, night_window
 from src.fetch.youtube import get_top_10_plays_video
 from src.send.render import render_email, perf_details
 from src.send.perf_card import perf_card_png, match_header_png
@@ -95,16 +95,18 @@ Tu es journaliste NBA, avec le style des rédacteurs de Trashtalk (le média bas
 
 RÈGLES (à respecter strictement) :
 1. Écris uniquement en français. Les termes basket courants (game-winner, triple-double, clutch, run…) sont permis, comme chez Trashtalk. Donne le prénom et le nom d'un joueur la première fois que tu le cites.
-2. N'utilise QUE les informations des MATCHS et des ARTICLES ci-dessous. Ne cite jamais un joueur qui n'y figure pas, n'affirme jamais de mémoire l'équipe, l'âge, le contrat, un transfert, une blessure ou la salle d'un joueur : les effectifs changent chaque saison et ta mémoire est périmée. Mieux vaut ne rien dire que dire faux.
-3. Statistiques : uniquement celles fournies, sans arrondir à ta façon ni en inventer. Les scores et les stats des MATCHS priment sur les articles. Ignore ce qui, dans un article, annonce un match déjà joué.
-4. Raconte les matchs marquants : le tournant, le run, le money time, ce qui a fait basculer la partie, plutôt qu'une suite de lignes de stats.
-5. Nomme les facteurs X : 2 à 4 joueurs de la nuit qui ont pesé plus que leurs points ne le disent, parce que les articles les citent (défense sur la star, tir décisif, énergie, retour de blessure) ou que leur +/- le montre. Dis ce qu'ils ont fait concrètement. Un +/- seul ne suffit pas à inventer une explication : sans article, contente-toi du constat.
-6. Juge une performance sur toute sa ligne (points, passes, rebonds, adresse, balles perdues), pas seulement au total de points : un 42-8-13 vaut mieux qu'un 43-8-3, et 43 points à 14/35 ne sont pas une soirée parfaite.
-7. Consacre les 1 ou 2 derniers paragraphes à l'actu NBA hors matchs tirée des ARTICLES : transferts, contrats, blessures, récompenses, polémiques, Français en NBA. Ignore tout ce qui ne concerne pas la NBA.
-8. Reformule toujours avec tes mots, ne recopie aucune phrase d'article. Quand une info vient d'un seul média, dis-le simplement (« selon The Athletic »).
-9. Pas de titres, pas de sections, pas de listes, pas de mise en forme, pas d'emojis : uniquement des paragraphes de texte brut, séparés par une ligne vide.
-10. Pas d'introduction (« Bonjour », « Bienvenue ») ni de signature : entre directement dans le vif.
-11. Longueur : 5 à 8 paragraphes, du plus marquant au plus anecdotique, sans viser l'exhaustivité : un match sans histoire peut tenir en une phrase ou être omis.
+2. N'utilise QUE les informations des MATCHS et des ARTICLES ci-dessous. Ne cite jamais un joueur qui n'y figure pas, n'affirme jamais de mémoire l'équipe, l'âge, le contrat, un transfert, une blessure ou la salle d'un joueur, ni la ville d'un match : les effectifs changent chaque saison et ta mémoire est périmée. Pour situer un match, nomme les équipes plutôt que la ville, sauf si la ville figure dans le récit fourni. Mieux vaut ne rien dire que dire faux.
+3. Statistiques : uniquement celles fournies, sans en inventer. Les scores et les stats des MATCHS priment sur les articles.
+4. Uniquement la nuit même : les matchs de cette nuit et ce qui a été annoncé cette nuit. Ignore dans les articles tout ce qui est plus ancien (matchs précédents, annonces des jours d'avant) ou qui annonce un match à venir. Une série en cours peut être rappelée en quelques mots, jamais présentée comme une nouvelle.
+5. Reste léger sur les chiffres : un ou deux par joueur, le plus parlant (« 42 points et 13 passes »), jamais une ligne de stats complète ni un détail au tir, sauf s'il fait l'histoire (un 14/35). Arrondis les temps (« à 32 secondes de la fin », jamais « 32,6 secondes ») et garde peu de scores intermédiaires.
+6. Raconte les 3 ou 4 matchs marquants : le tournant, ce qui a fait basculer la partie, plutôt qu'une suite de faits. Les autres matchs peuvent être omis.
+7. Nomme les facteurs X : 2 ou 3 joueurs de la nuit qui ont pesé plus que leurs points ne le disent, parce que les articles les citent (défense sur la star, tir décisif, énergie, retour de blessure) ou que leur +/- le montre. Dis ce qu'ils ont fait concrètement. Un +/- seul ne suffit pas à inventer une explication : sans article, contente-toi du constat.
+8. Juge une performance sur toute sa ligne (points, passes, rebonds, adresse, balles perdues), pas seulement au total de points : un 42-8-13 vaut mieux qu'un 43-8-3, et 43 points à 14/35 ne sont pas une soirée parfaite.
+9. Consacre le dernier paragraphe à l'actu NBA hors matchs de la nuit tirée des ARTICLES, en ne gardant que l'essentiel : transferts, blessures, récompenses, polémiques, Français en NBA. S'il n'y a rien de neuf, saute ce paragraphe. Ignore tout ce qui ne concerne pas la NBA.
+10. Reformule toujours avec tes mots, ne recopie aucune phrase d'article. Quand une info vient d'un seul média, dis-le simplement (« selon The Athletic »).
+11. Pas de titres, pas de sections, pas de listes, pas de mise en forme, pas d'emojis : uniquement des paragraphes de texte brut, séparés par une ligne vide.
+12. Pas d'introduction (« Bonjour », « Bienvenue ») ni de signature : entre directement dans le vif.
+13. Longueur : 4 à 6 paragraphes courts, 3 500 caractères au maximum en tout, du plus marquant au plus anecdotique.
 
 TON : vif, imagé, opinions assumées, mais l'info d'abord. Pas de clichés sportifs creux.
 
@@ -114,7 +116,7 @@ LES LIGNES DE STATS LES PLUS COMPLÈTES DE LA NUIT :
 LES MATCHS :
 {format_games_for_prompt(games, performers, stories)}
 
-LES ARTICLES (des dernières 30 heures) :
+LES ARTICLES (parus cette nuit) :
 {format_articles_for_prompt(articles)}
 
 ÉCRIS LE RÉCAP :"""
@@ -244,7 +246,7 @@ def run(dry_run=False):
             all_top_performers, stories = [], {}
         
         logger.info("📰 Fetching news...")
-        news = fetch_news(include_content=False)  # 3 Trashtalk + 5 Athletic RSS items
+        news = fetch_news(include_content=False, window=night_window(game_date_obj))  # Trashtalk + The Athletic, parus cette nuit
         
         logger.info("🎬 Fetching Top 10 Plays video...")
         top_10_video = get_top_10_plays_video(target_date=target)
@@ -262,7 +264,7 @@ def run(dry_run=False):
         organized_games = organize_game_data(games, all_top_performers)
         
         logger.info("🤖 Generating newsletter content...")
-        articles = fetch_articles()
+        articles = fetch_articles(game_date_obj)
         prompt = build_prompt(games, articles, all_top_performers, stories)
         logger.debug(f"Prompt preview: {prompt[:300]}...")
         

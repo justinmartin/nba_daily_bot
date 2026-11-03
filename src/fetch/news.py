@@ -1,6 +1,6 @@
 
 import feedparser
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import zip_longest
 import logging
 import requests
@@ -34,7 +34,8 @@ def _load_feed(source_url):
     return feedparser.parse(response.content)
 
 
-def fetch_news(source_limits=None, include_content=False):
+def fetch_news(source_limits=None, include_content=False, window=None):
+    """window : (début, fin) en UTC, pour ne garder que les articles parus pendant la nuit."""
     try:
         sources = source_limits or DEFAULT_NEWS_SOURCES
         headlines = []
@@ -53,9 +54,13 @@ def fetch_news(source_limits=None, include_content=False):
                 logger.warning(f"⚠️ Feed parsing issue for {source_name}: {feed.bozo_exception}")
 
             source_articles = []
-            for entry in feed.entries[:source_limit]:
+            for entry in feed.entries:
+                if len(source_articles) == source_limit:
+                    break
                 try:
                     published = entry.get("published_parsed")
+                    if window and not (published and window[0] <= datetime(*published[:6], tzinfo=timezone.utc) <= window[1]):
+                        continue
                     date_str = datetime(*published[:6]).strftime("%d %b %Y %H:%M") if published else "N/A"
                     summary = entry.get("summary") or entry.get("description") or ""
 
