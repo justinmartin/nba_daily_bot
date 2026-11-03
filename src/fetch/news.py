@@ -1,6 +1,7 @@
 
 import feedparser
 from datetime import datetime
+from itertools import zip_longest
 import logging
 import requests
 from bs4 import BeautifulSoup
@@ -81,7 +82,9 @@ def fetch_news(source_limits=None, include_content=False):
             headlines.extend(source_articles)
             logger.info(f"✅ Fetched {len(source_articles)} articles from {source_name}")
 
-        return headlines
+        # Un article de chaque source à tour de rôle : le mail n'en montre que 6
+        by_source = [[a for a in headlines if a["source"] == source["name"]] for source in sources]
+        return [a for round_ in zip_longest(*by_source) for a in round_ if a]
 
     except Exception as e:
         logger.error(f"❌ Failed to fetch news: {e}")

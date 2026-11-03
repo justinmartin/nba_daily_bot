@@ -4,9 +4,9 @@ Le récap NBA de la nuit, en français, dans ta boîte mail chaque matin vers 7 
 
 ## Ce qu'il y a dans le mail
 
-- **La nuit en bref** : un résumé rédigé par Claude, en français, façon Trashtalk, à partir des seuls résultats et actus du jour (aucun joueur ni chiffre inventé).
+- **La nuit en bref** : un récit rédigé par Claude, en français, façon Trashtalk : le tournant des matchs marquants, les facteurs X que la feuille de stats ne montre pas, puis l'actu NBA hors matchs. Claude ne s'appuie que sur les articles et les box scores fournis (aucun joueur ni chiffre inventé).
 - **Le tableau des scores** en haut du mail : chaque score renvoie à la carte du match.
-- **La perf de la nuit** : le meilleur marqueur, sur une carte aux couleurs de son équipe.
+- **La perf de la nuit** : la ligne de stats la plus complète, sur une carte aux couleurs de son équipe (voir « Classement des joueurs »).
 - **Une carte par match** :
   - aux couleurs du vainqueur, avec les logos en filigrane, dans l'ordre extérieur / domicile ;
   - le bouton **Résumé Trashtalk** si l'article est paru, sinon **Résumé ESPN** ;
@@ -36,7 +36,13 @@ Tout passe par GitHub Actions (`.github/workflows/nba-daily.yml`) :
 - En cas d'échec, un mail d'alerte part aux destinataires (`.github/scripts/notify_failure.py`).
 - Un job `keepalive` empêche GitHub de désactiver le workflow après 60 jours sans commit.
 
+## Classement des joueurs
+
+La perf de la nuit, le Top 5 et les joueurs de chaque carte sont triés au **Game Score** de John Hollinger (`src/fetch/players.py`), qui résume toute la ligne de stats en un chiffre : points, passes, rebonds, interceptions et contres comptent, tirs ratés, lancers ratés, balles perdues et fautes pénalisent. Un 42-7-13 à 14/24 passe donc devant un 43-3-8 à 14/35.
+
 ## Rédaction du résumé
+
+Claude reçoit, pour chaque match, les box scores (dont le +/-), les absents et le récit d'ESPN, plus les articles des 30 dernières heures (`src/fetch/articles.py`) : Trashtalk (articles entiers), Basket USA, Yahoo Sports, Hoops Rumors, RealGM, CBS Sports et The Athletic (titre et résumé du flux public seulement, le site est payant).
 
 Ordre d'essai (`src/model/hf_client.py`) :
 
@@ -53,7 +59,8 @@ Ordre d'essai (`src/model/hf_client.py`) :
 | Top 10 et vidéos des matchs | chaîne YouTube officielle de la NBA (page « Vidéos » et flux RSS) |
 | Logos et couleurs des équipes | API d'ESPN |
 | Résumés des matchs | Trashtalk (RSS), sinon page « recap » d'ESPN |
-| Actus | Trashtalk (RSS) et The Athletic, flux NBA |
+| Liens d'actus du mail | Trashtalk (RSS) et The Athletic, flux NBA |
+| Matière du récap | Récits et box scores ESPN, Trashtalk, Basket USA, Yahoo Sports, Hoops Rumors, RealGM, CBS Sports, The Athletic |
 
 ## Secrets GitHub
 
@@ -83,7 +90,7 @@ Pour la rédaction par Claude en local, il faut Claude Code installé et connect
 ```
 src/
 ├── fetch/      scores.py, players.py (ESPN) · schedule.py (programme + diffuseurs) · news.py · youtube.py
-│               extras.py : logos, résumés Trashtalk / ESPN, vidéos des matchs
+│               extras.py : logos, résumés Trashtalk / ESPN, vidéos des matchs · articles.py : matière du récap
 ├── model/      hf_client.py : Claude Code, puis Hugging Face
 ├── send/       render.py (mail HTML) · perf_card.py (images) · mailer.py (SMTP, images jointes)
 ├── config.py   variables d'environnement

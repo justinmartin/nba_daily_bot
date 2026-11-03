@@ -1,143 +1,130 @@
-
 import logging
+import re
 import requests
 from datetime import date
 
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 15
+SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
 
-def get_top_performers(game_id, limit=5, target_date=None):
-    if target_date is None:
-        target_date = date.today()
-    
-    date_str = target_date.strftime('%Y%m%d')
-    
+
+def game_score(p):
+    """
+    Le Game Score de John Hollinger : la ligne de stats entière en un seul chiffre (un 42-8-13 passe devant
+    un 43-8-3), tirs ratés et balles perdues compris.
+    """
+    return round(
+        p['pts'] + 0.4 * p['fgm'] - 0.7 * p['fga'] - 0.4 * (p['fta'] - p['ftm'])
+        + 0.7 * p['oreb'] + 0.3 * p['dreb'] + p['stl'] + 0.7 * p['ast'] + 0.7 * p['blk']
+        - 0.4 * p['pf'] - p['tov'], 1)
+
+
+def rank(p):
+    """Clé de tri des joueurs : le Game Score."""
+    return p.get('score', p.get('pts', 0))
+
+
+def get_night(target_date=None):
+    """
+    Toute la nuit vue par ESPN : ({joueurs de tous les matchs}, {id du match : {récit, absents}}).
+    Les joueurs sont tous ceux qui ont joué, triés par équipe selon leur Game Score.
+    """
+    target_date = target_date or date.today()
     try:
-        logger.info(f"🏀 Fetching player stats from ESPN API for {target_date}...")
-        
-        url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-        params = {"dates": date_str}
-        
-        response = requests.get(url, params=params, timeout=TIMEOUT)
+        logger.info(f"🏀 Fetching box scores and recaps from ESPN for {target_date}...")
+        response = requests.get(SCOREBOARD_URL, params={"dates": target_date.strftime('%Y%m%d')}, timeout=TIMEOUT)
         response.raise_for_status()
-        data = response.json()
-        
-        games = data.get("events", [])
-        
-        if not games:
-            logger.warning(f"⚠️ No games found on ESPN for {target_date}")
-            return []
-        
-        all_performers = []
-        
-        for game in games:
-            try:
-                game_id = game.get("id")
-                performers = _get_boxscore_performers(game_id)
-                all_performers.extend(performers)
-            except Exception as e:
-                logger.debug(f"⚠️ Error processing game {game.get('id')}: {e}")
-                continue
-        
-        
-        logger.info(f"✅ ESPN API: Found {len(all_performers)} total performers")
-        return all_performers
-        
-    except requests.exceptions.Timeout:
-        logger.error(f"❌ ESPN API timeout after {TIMEOUT}s")
-        return []
-    except requests.exceptions.RequestException as e:
+        events = response.json().get("events", [])
+    except requests.RequestException as e:
         logger.error(f"❌ ESPN API request failed: {e}")
-        return []
-    except Exception as e:
-        logger.error(f"❌ ESPN API error: {e}")
-        return []
+        return [], {}
+    if not events:
+        logger.warning(f"⚠️ No games found on ESPN for {target_date}")
 
-def _get_boxscore_performers(game_id):
-    try:
-        url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event={game_id}"
-        response = requests.get(url, timeout=TIMEOUT)
-        response.raise_for_status()
-        data = response.json()
-        
-        boxscore = data.get("boxscore", {})
-        players_data = boxscore.get("players", [])
-        
-        if not players_data:
-            return []
-        
-        all_performers = []
-        
-        for team_data in players_data:
-            team_abbr = team_data.get("team", {}).get("abbreviation", "UNK")
-            
-            statistics = team_data.get("statistics", [])
-            if not statistics:
-                continue
-            
-            athletes = statistics[0].get("athletes", [])
-            
-            team_performers = []
-            for athlete in athletes:
-                performer = _parse_boxscore_player(athlete, team_abbr)
-                if performer and performer.get('pts', 0) > 0:  # Seulement les joueurs ayant marqué
-                    team_performers.append(performer)
-            
-            team_performers.sort(key=lambda x: x.get('pts', 0), reverse=True)
-            top_3 = team_performers[:3]
-            all_performers.extend(top_3)
-        
-        return all_performers
-        
-    except Exception as e:
-        logger.debug(f"⚠️ Error fetching boxscore for game {game_id}: {e}")
-        return []
+    performers, stories = [], {}
+    for event in events:
+        game_id = event.get("id")
+        try:
+            response = requests.get(SUMMARY_URL, params={"event": game_id}, timeout=TIMEOUT)
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as e:
+            logger.warning(f"⚠️ ESPN summary unavailable for game {game_id}: {e}")
+            continue
+        performers.extend(_box_players(data, game_id))
+        stories[game_id] = {"story": _story(data), "out": _absents(data)}
+    logger.info(f"✅ ESPN: {len(performers)} players, {sum(1 for s in stories.values() if s['story'])} recaps")
+    return performers, stories
 
-def _parse_boxscore_player(athlete, team_abbr):
+
+def _story(data):
+    """Le récit du match écrit pour ESPN, en texte brut."""
+    article = data.get("article") or {}
+    text = re.sub(r"<[^>]+>", " ", article.get("story") or "")
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _absents(data):
+    """{ équipe : [joueurs absents] }"""
+    out = {}
+    for team in data.get("injuries") or []:
+        abbr = (team.get("team") or {}).get("abbreviation", "")
+        names = [(i.get("athlete") or {}).get("displayName") for i in team.get("injuries") or []
+                 if str(i.get("status", "")).lower() == "out"]
+        if abbr and any(names):
+            out[abbr] = [n for n in names if n]
+    return out
+
+
+def _box_players(data, game_id):
+    players = []
+    for team_data in (data.get("boxscore") or {}).get("players", []):
+        team_abbr = (team_data.get("team") or {}).get("abbreviation", "UNK")
+        for block in team_data.get("statistics") or []:
+            labels = block.get("labels") or block.get("names") or []
+            team_players = [p for p in (_parse_player(a, team_abbr, labels) for a in block.get("athletes") or []) if p]
+            for p in team_players:
+                p['game_id'] = game_id
+            players.extend(sorted(team_players, key=rank, reverse=True))
+    return players
+
+
+def _made_attempted(value):
+    made, _, attempted = str(value or "0-0").partition("-")
+    return int(made or 0), int(attempted or 0)
+
+
+def _pct(made, attempted):
+    return round(made / attempted * 100, 1) if attempted else 0.0
+
+
+def _parse_player(athlete, team_abbr, labels):
+    """Lit la ligne de stats par le nom des colonnes ; None pour un joueur qui n'a pas joué."""
+    stats = dict(zip(labels, athlete.get("stats") or []))
+    if not stats or not stats.get("MIN") or stats.get("MIN") == "0":
+        return None
     try:
-        name = athlete.get("athlete", {}).get("displayName", "Unknown")
-        stats = athlete.get("stats", [])
-        
-        if len(stats) < 10:
-            return None
-        
-        pts = int(stats[1]) if stats[1] else 0  # PTS à l'index 1
-        reb = int(stats[5]) if stats[5] else 0  # REB à l'index 5
-        ast = int(stats[6]) if stats[6] else 0  # AST à l'index 6
-        stl = int(stats[8]) if stats[8] else 0  # STL à l'index 8
-        blk = int(stats[9]) if stats[9] else 0  # BLK à l'index 9
-        
-        fg_str = stats[2] if stats[2] else "0-0"
-        fg_parts = fg_str.split('-')
-        fgm = int(fg_parts[0]) if len(fg_parts) > 0 else 0
-        fga = int(fg_parts[1]) if len(fg_parts) > 1 else 0
-        fg_pct = round((fgm / fga * 100), 1) if fga > 0 else 0.0
-        
-        fg3_str = stats[3] if stats[3] else "0-0"
-        fg3_parts = fg3_str.split('-')
-        fg3m = int(fg3_parts[0]) if len(fg3_parts) > 0 else 0
-        fg3a = int(fg3_parts[1]) if len(fg3_parts) > 1 else 0
-        fg3_pct = round((fg3m / fg3a * 100), 1) if fg3a > 0 else 0.0
-        
-        performer = {
-            'name': name,
+        number = lambda key: int(str(stats.get(key) or 0).replace("+", ""))
+        fgm, fga = _made_attempted(stats.get("FG"))
+        fg3m, fg3a = _made_attempted(stats.get("3PT"))
+        ftm, fta = _made_attempted(stats.get("FT"))
+        p = {
+            'name': (athlete.get("athlete") or {}).get("displayName", "Unknown"),
             'team': team_abbr,
-            'pts': pts,
-            'reb': reb,
-            'ast': ast,
-            'blk': blk,
-            'stl': stl,
-            'fg_pct': fg_pct,
-            'fg3_pct': fg3_pct,
-            'fgm': fgm,
-            'fga': fga,
-            'fg3m': fg3m,
-            'fg3a': fg3a,
+            'starter': bool(athlete.get("starter")),
+            'min': number("MIN"),
+            'pts': number("PTS"), 'reb': number("REB"), 'ast': number("AST"),
+            'blk': number("BLK"), 'stl': number("STL"), 'tov': number("TO"),
+            'oreb': number("OREB"), 'dreb': number("DREB"), 'pf': number("PF"),
+            'plus_minus': number("+/-"),
+            'fgm': fgm, 'fga': fga, 'fg_pct': _pct(fgm, fga),
+            'fg3m': fg3m, 'fg3a': fg3a, 'fg3_pct': _pct(fg3m, fg3a),
+            'ftm': ftm, 'fta': fta,
         }
-        
-        return performer
-        
-    except Exception as e:
+    except (TypeError, ValueError) as e:
         logger.debug(f"⚠️ Error parsing boxscore player: {e}")
         return None
+    p['score'] = game_score(p)
+    return p

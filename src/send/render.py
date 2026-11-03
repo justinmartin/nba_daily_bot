@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 import logging
 from html import escape
 
+from src.fetch.players import rank
+
 logger = logging.getLogger(__name__)
 
 ACCENT = "#ff7a1a"
@@ -203,7 +205,7 @@ def _game_card(i, g, teams, link, video, fallback_video_url, header_img=None):
 
 def _top5(top_performers, teams):
     seen, ranked, rows = set(), [], ""
-    for p in sorted(top_performers, key=lambda x: x.get('pts', 0), reverse=True):
+    for p in sorted(top_performers, key=rank, reverse=True):
         if p.get('name') in seen:
             continue
         seen.add(p.get('name'))
@@ -331,7 +333,7 @@ def render_email(summary_text, news, top_performers=None, games=None, organized_
 
     if organized_games:
         body += _score_grid(organized_games, teams)
-        best = max(top_performers, key=lambda p: p.get('pts', 0)) if top_performers else None
+        best = max(top_performers, key=rank) if top_performers else None
         if best:
             body += _perf_card(best, teams, perf_img)
 

@@ -8,8 +8,9 @@ from src.fetch.schedule import get_upcoming_games
 from src.model.hf_client import generate
 import os
 from src.send.mailer import send_mail
-from src.fetch.players import get_top_performers
+from src.fetch.players import get_night, rank
 from src.fetch.news import fetch_news
+from src.fetch.articles import fetch_articles
 from src.fetch.youtube import get_top_10_plays_video
 from src.send.render import render_email, perf_details
 from src.send.perf_card import perf_card_png, match_header_png
@@ -38,82 +39,86 @@ TRICODE_TO_NAME = {
 
 NAME_TO_TRICODE = {v: k for k, v in TRICODE_TO_NAME.items()}
 
-def build_prompt(games, news, top_performers):
-    if not games:
-        return "❌ No games played today."
-    
-    dominant = sorted(games, key=lambda g: abs(g.home_score - g.away_score), reverse=True)[:3]
-    
-    wins_desc = []
-    for g in dominant:
-        winner = g.away_team if g.away_score > g.home_score else g.home_team
-        loser = g.home_team if g.away_score > g.home_score else g.away_team
-        margin = abs(g.home_score - g.away_score)
-        winner_score = g.away_score if g.away_score > g.home_score else g.home_score
-        loser_score = g.home_score if g.away_score > g.home_score else g.away_score
-        wins_desc.append(f"• {winner} bat {loser} {winner_score}-{loser_score} (écart : {margin} pts)")
-    
-    wins_text = "\n".join(wins_desc)
-    
-    news_section = []
-    for n in news[:8]:
-        source = n.get('source', 'News')
-        title = n.get('title', 'No title')
-        summary = n.get('summary', '')
-        if summary:
-            news_section.append(f"• [{source}] {title}\n  {summary[:220].strip()}")
-        else:
-            news_section.append(f"• [{source}] {title}")
-    news_headlines = "\n\n".join(news_section) if news_section else ""
-    
-    close_games = sum(1 for g in games if abs(g.home_score - g.away_score) <= 5)
-    blowouts = sum(1 for g in games if abs(g.home_score - g.away_score) > 15)
-    
-    all_games_summary = []
+def _player_line(p):
+    """« Nom : 12 pts (4/6, 2/3 à 3 pts, 2/2 LF), 9 reb, 3 ast, 2 int, 1 ctr, 2 bp, +21 en 31 min »"""
+    line = (f"{p['name']} : {p['pts']} pts ({p['fgm']}/{p['fga']}, {p['fg3m']}/{p['fg3a']} à 3 pts, {p['ftm']}/{p['fta']} LF), "
+            f"{p['reb']} reb, {p['ast']} ast, {p['stl']} int, {p['blk']} ctr, {p['tov']} bp, ")
+    return line + f"{p['plus_minus']:+d} en {p['min']} min"
+
+
+def format_games_for_prompt(games, performers, stories):
+    """Chaque match : score, feuille de stats (y compris le +/-), absents, puis le récit d'ESPN."""
+    blocks = []
     for g in games:
-        away_record = f"({g.away_wins}-{g.away_losses})" if g.away_wins is not None else ""
-        home_record = f"({g.home_wins}-{g.home_losses})" if g.home_wins is not None else ""
-        margin = abs(g.away_score - g.home_score)
-        all_games_summary.append(f"• {g.away_team} {away_record} {g.away_score} - {g.home_score} {g.home_team} {home_record} | Margin: {margin}pts")
-    games_summary_text = "\n".join(all_games_summary)
-    
-    performers_section = format_performers_for_prompt(organize_game_data(games, top_performers))
-    
-    prompt = f"""TA MISSION :
-Tu es journaliste NBA, avec le style des rédacteurs de Trashtalk (le média basket français) : drôle, piquant, mais toujours informé. Rédige EN FRANÇAIS le récap de la nuit NBA pour une newsletter du matin.
+        record = lambda w, l: f" ({w}-{l})" if w is not None else ""
+        block = [f"### {g.away_team}{record(g.away_wins, g.away_losses)} {g.away_score} - {g.home_score} {g.home_team}{record(g.home_wins, g.home_losses)}"]
+        info = stories.get(g.id) or {}
+        for team in (g.away_team, g.home_team):
+            abbr = NAME_TO_TRICODE.get(team, team)
+            players = sorted((p for p in performers if p['team'] == abbr), key=rank, reverse=True)
+            # Les 7 plus complets, plus le meilleur +/- de l'équipe s'il n'y est pas : un facteur X se cache souvent là
+            shown = players[:7]
+            best_pm = max(players, key=lambda p: p['plus_minus'], default=None)
+            if best_pm and best_pm not in shown:
+                shown.append(best_pm)
+            block.append(f"{team} :")
+            block += [f"- {_player_line(p)}" for p in shown]
+            if info.get("out", {}).get(abbr):
+                block.append(f"Absents : {', '.join(info['out'][abbr])}")
+        if info.get("story"):
+            block.append(f"Récit ESPN : {info['story'][:1600]}")
+        blocks.append("\n".join(block))
+    return "\n\n".join(blocks)
+
+
+def format_articles_for_prompt(articles):
+    lines = []
+    for a in articles:
+        when = a['published'].strftime('%d/%m %H:%M UTC')
+        lines.append(f"[{a['source']}, {when}] {a['title']}" + (f"\n{a['text']}" if a['text'] else ""))
+    return "\n\n".join(lines)
+
+
+def build_prompt(games, articles, performers, stories):
+    if not games:
+        return "No games played today."
+
+    seen, best = set(), []
+    for p in sorted(performers, key=rank, reverse=True):
+        if p['name'] not in seen:
+            seen.add(p['name'])
+            best.append(p)
+    best_text = "\n".join(f"{i}. {_player_line(p)}" for i, p in enumerate(best[:8], 1))
+
+    return f"""TA MISSION :
+Tu es journaliste NBA, avec le style des rédacteurs de Trashtalk (le média basket français) : drôle, piquant, mais toujours informé. Rédige EN FRANÇAIS le récap de la nuit NBA pour une newsletter du matin. Le lecteur a déjà les scores et les meilleures lignes de stats juste à côté : ta valeur, c'est ce que la feuille de stats ne dit pas.
 
 RÈGLES (à respecter strictement) :
-1. Écris uniquement en français. Les termes basket courants (game-winner, triple-double, clutch, run…) sont permis, comme chez Trashtalk.
-2. N'utilise QUE les informations des DONNÉES ci-dessous. Ne cite jamais un joueur absent des données, n'affirme jamais de mémoire l'équipe, l'âge, le contrat, un transfert, une blessure ou la salle d'un joueur : les effectifs changent chaque saison et ta mémoire est périmée. Mieux vaut ne rien dire que dire faux.
-3. Statistiques : uniquement celles fournies, sans arrondir à ta façon ni en inventer.
-4. Mets en avant les gros cartons, les surprises et les performances individuelles des données ; chambre gentiment les perdants, sans méchanceté.
-5. Reprends 2 ou 3 actus NBA des TITRES DU JOUR quand elles sont liées aux matchs ; ignore tout ce qui ne concerne pas la NBA.
-6. Pas de titres, pas de sections, pas de listes, pas de mise en forme, pas d'emojis : uniquement des paragraphes de texte brut, séparés par une ligne vide.
-7. Pas d'introduction (« Bonjour », « Bienvenue ») ni de signature : entre directement dans le vif.
-8. Longueur : 4 à 6 paragraphes, du plus marquant au plus anecdotique.
+1. Écris uniquement en français. Les termes basket courants (game-winner, triple-double, clutch, run…) sont permis, comme chez Trashtalk. Donne le prénom et le nom d'un joueur la première fois que tu le cites.
+2. N'utilise QUE les informations des MATCHS et des ARTICLES ci-dessous. Ne cite jamais un joueur qui n'y figure pas, n'affirme jamais de mémoire l'équipe, l'âge, le contrat, un transfert, une blessure ou la salle d'un joueur : les effectifs changent chaque saison et ta mémoire est périmée. Mieux vaut ne rien dire que dire faux.
+3. Statistiques : uniquement celles fournies, sans arrondir à ta façon ni en inventer. Les scores et les stats des MATCHS priment sur les articles. Ignore ce qui, dans un article, annonce un match déjà joué.
+4. Raconte les matchs marquants : le tournant, le run, le money time, ce qui a fait basculer la partie, plutôt qu'une suite de lignes de stats.
+5. Nomme les facteurs X : 2 à 4 joueurs de la nuit qui ont pesé plus que leurs points ne le disent, parce que les articles les citent (défense sur la star, tir décisif, énergie, retour de blessure) ou que leur +/- le montre. Dis ce qu'ils ont fait concrètement. Un +/- seul ne suffit pas à inventer une explication : sans article, contente-toi du constat.
+6. Juge une performance sur toute sa ligne (points, passes, rebonds, adresse, balles perdues), pas seulement au total de points : un 42-8-13 vaut mieux qu'un 43-8-3, et 43 points à 14/35 ne sont pas une soirée parfaite.
+7. Consacre les 1 ou 2 derniers paragraphes à l'actu NBA hors matchs tirée des ARTICLES : transferts, contrats, blessures, récompenses, polémiques, Français en NBA. Ignore tout ce qui ne concerne pas la NBA.
+8. Reformule toujours avec tes mots, ne recopie aucune phrase d'article. Quand une info vient d'un seul média, dis-le simplement (« selon The Athletic »).
+9. Pas de titres, pas de sections, pas de listes, pas de mise en forme, pas d'emojis : uniquement des paragraphes de texte brut, séparés par une ligne vide.
+10. Pas d'introduction (« Bonjour », « Bienvenue ») ni de signature : entre directement dans le vif.
+11. Longueur : 5 à 8 paragraphes, du plus marquant au plus anecdotique, sans viser l'exhaustivité : un match sans histoire peut tenir en une phrase ou être omis.
 
 TON : vif, imagé, opinions assumées, mais l'info d'abord. Pas de clichés sportifs creux.
 
-DONNÉES :
-PLUS GROS ÉCARTS DE LA NUIT :
-{wins_text}
+LES LIGNES DE STATS LES PLUS COMPLÈTES DE LA NUIT :
+{best_text}
 
-STATS DE LA SOIRÉE :
-- Matchs : {len(games)}
-- Cartons (écart > 15 pts) : {blowouts}
-- Matchs serrés (écart ≤ 5 pts) : {close_games}
+LES MATCHS :
+{format_games_for_prompt(games, performers, stories)}
 
-TOUS LES MATCHS :
-{games_summary_text}
-
-{performers_section}
-
-TITRES DU JOUR :
-{news_headlines}
+LES ARTICLES (des dernières 30 heures) :
+{format_articles_for_prompt(articles)}
 
 ÉCRIS LE RÉCAP :"""
-    
-    return prompt
+
 
 def organize_game_data(games, all_performers):
     organized_games = []
@@ -139,13 +144,13 @@ def organize_game_data(games, all_performers):
         for p in all_performers:
             if p['team'] == winner_tricode and p['name'] not in winner_perf_dict:
                 winner_perf_dict[p['name']] = p
-        winner_performers = sorted(winner_perf_dict.values(), key=lambda x: x.get('pts', 0), reverse=True)[:3]
+        winner_performers = sorted(winner_perf_dict.values(), key=rank, reverse=True)[:3]
         
         loser_perf_dict = {}
         for p in all_performers:
             if p['team'] == loser_tricode and p['name'] not in loser_perf_dict:
                 loser_perf_dict[p['name']] = p
-        loser_performers = sorted(loser_perf_dict.values(), key=lambda x: x.get('pts', 0), reverse=True)[:1]
+        loser_performers = sorted(loser_perf_dict.values(), key=rank, reverse=True)[:1]
         
         home_record = f"{game.home_wins}-{game.home_losses}" if (game.home_wins is not None and game.home_losses is not None) else ""
         away_record = f"{game.away_wins}-{game.away_losses}" if (game.away_wins is not None and game.away_losses is not None) else ""
@@ -169,50 +174,6 @@ def organize_game_data(games, all_performers):
         organized_games.append(game_data)
     
     return organized_games
-
-def format_performers_for_prompt(organized_games):
-    if not organized_games:
-        return ""
-    
-    performers_text = "MATCH DETAILS WITH TOP PERFORMERS:\n"
-    
-    for game in organized_games:
-        performers_text += f"\n• {game['winner']} ({game['winner_record']}) {game['winner_score']} - {game['loser_score']} {game['loser']} ({game['loser_record']}) | Margin: {game['margin']}pts\n"
-        
-        if game['winner_top_performers']:
-            performers_text += "  🏆 Winner's stars:\n"
-            for p in game['winner_top_performers']:
-                team_tricode = p.get('team', 'N/A')
-                team_display = TRICODE_TO_NAME.get(team_tricode, team_tricode)
-                
-                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}%"
-                
-                blk_stl = []
-                if p.get('blk'):
-                    blk_stl.append(f"{p.get('blk')}blk")
-                if p.get('stl'):
-                    blk_stl.append(f"{p.get('stl')}stl")
-                if blk_stl:
-                    stats += f", {', '.join(blk_stl)}"
-                
-                performers_text += f"    - {p['name']} ({team_tricode} - {team_display}): {stats}\n"
-        
-        if game['loser_top_performers']:
-            performers_text += "  🔥 Leading loser:\n"
-            for p in game['loser_top_performers']:
-                team_tricode = p.get('team', 'N/A')
-                team_display = TRICODE_TO_NAME.get(team_tricode, team_tricode)
-                stats = f"{p.get('pts', 0)}pts, {p.get('reb', 0)}reb, {p.get('ast', 0)}ast, FG:{p.get('fg_pct', 'N/A')}%"
-                blk_stl = []
-                if p.get('blk'):
-                    blk_stl.append(f"{p.get('blk')}blk")
-                if p.get('stl'):
-                    blk_stl.append(f"{p.get('stl')}stl")
-                if blk_stl:
-                    stats += f", {', '.join(blk_stl)}"
-                performers_text += f"    - {p['name']} ({team_tricode} - {team_display}): {stats}\n"
-    
-    return performers_text
 
 def send_schedule_only(target, dry_run=False):
     """Pas de match la veille : si des matchs sont prévus ce soir (reprise de saison,
@@ -269,18 +230,18 @@ def run(dry_run=False):
             return
         
         logger.info("🔥 Fetching top performers...")
-        all_top_performers = []
+        all_top_performers, stories = [], {}
         
         from datetime import datetime as dt
         game_date_obj = dt.strptime(games[0].date, '%Y-%m-%d').date() if games else target
         
         try:
             logger.info(f"Fetching all top performers for {game_date_obj}...")
-            all_top_performers = get_top_performers('', limit=50, target_date=game_date_obj)
+            all_top_performers, stories = get_night(game_date_obj)
             logger.info(f"✅ Found {len(all_top_performers)} total performers")
         except Exception as e:
             logger.error(f"⚠️ Failed to fetch top performers: {e}")
-            all_top_performers = []
+            all_top_performers, stories = [], {}
         
         logger.info("📰 Fetching news...")
         news = fetch_news(include_content=False)  # 3 Trashtalk + 5 Athletic RSS items
@@ -301,7 +262,8 @@ def run(dry_run=False):
         organized_games = organize_game_data(games, all_top_performers)
         
         logger.info("🤖 Generating newsletter content...")
-        prompt = build_prompt(games, news, all_top_performers)
+        articles = fetch_articles()
+        prompt = build_prompt(games, articles, all_top_performers, stories)
         logger.debug(f"Prompt preview: {prompt[:300]}...")
         
         try:
@@ -334,7 +296,7 @@ def run(dry_run=False):
         # La perf de la nuit, dessinée en image (logo en filigrane, rendu identique dans toutes les messageries)
         perf_png = None
         if all_top_performers:
-            best = max(all_top_performers, key=lambda p: p.get('pts', 0))
+            best = max(all_top_performers, key=rank)
             t = teams.get(best.get('team')) or {}
             if t:
                 perf_png = perf_card_png(best.get('name', ''), perf_details(best), int(best.get('pts', 0)), t['color'], t['abbr'])
