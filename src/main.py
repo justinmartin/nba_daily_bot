@@ -9,7 +9,7 @@ from src.model.hf_client import generate
 import os
 from src.send.mailer import send_mail
 from src.fetch.players import get_night, rank
-from src.fetch.news import fetch_news
+from src.fetch.news import fetch_news, fetch_night_links
 from src.fetch.articles import fetch_articles, night_window
 from src.fetch.youtube import get_top_10_plays_video
 from src.send.render import render_email, perf_details
@@ -246,7 +246,7 @@ def run(dry_run=False):
             all_top_performers, stories = [], {}
         
         logger.info("📰 Fetching news...")
-        news = fetch_news(include_content=False, window=night_window(game_date_obj))  # Trashtalk + The Athletic, parus cette nuit
+        news = fetch_night_links(night_window(game_date_obj))
         
         logger.info("🎬 Fetching Top 10 Plays video...")
         top_10_video = get_top_10_plays_video(target_date=target)

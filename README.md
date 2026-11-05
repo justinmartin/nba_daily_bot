@@ -14,7 +14,7 @@ Le récap NBA de la nuit, en français, dans ta boîte mail chaque matin vers 7 
   - les deux meilleurs joueurs du vainqueur et le meilleur du perdant.
 - **Le Top 5 de la nuit** et le lien vers le **Top 10 officiel** sur YouTube.
 - **Ce soir** : le programme de la nuit suivante avec les diffuseurs français.
-- **Les actus** : Trashtalk et le flux NBA de The Athletic.
+- **Les actus** : 6 liens. Trashtalk et le flux NBA de The Athletic parus dans la nuit, complétés au besoin par ESPN (papiers, puis résumés de matchs) et les derniers articles de The Athletic, qui peuvent dater de la veille.
 
 Si l'IA ne répond pas, le mail part quand même, avec un court résumé de repli.
 
@@ -59,7 +59,7 @@ Ordre d'essai (`src/model/hf_client.py`) :
 | Top 10 et vidéos des matchs | chaîne YouTube officielle de la NBA (page « Vidéos » et flux RSS) |
 | Logos et couleurs des équipes | API d'ESPN |
 | Résumés des matchs | Trashtalk (RSS), sinon page « recap » d'ESPN |
-| Liens d'actus du mail | Trashtalk (RSS) et The Athletic, flux NBA |
+| Liens d'actus du mail | Trashtalk (RSS), The Athletic (flux NBA), ESPN (API publique) |
 | Matière du récap | Récits et box scores ESPN, Trashtalk, Basket USA, Yahoo Sports, Hoops Rumors, RealGM, CBS Sports, The Athletic |
 
 ## Secrets GitHub

@@ -1,6 +1,6 @@
 
 import feedparser
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from itertools import zip_longest
 import logging
 import requests
@@ -15,10 +15,12 @@ except Exception:
 
 TRASHTALK_RSS = "https://www.trashtalk.co/feed/"
 ATHLETIC_RSS = "https://www.nytimes.com/athletic/rss/nba/"  # flux NBA (le flux « news » mélange tous les sports)
+ESPN_NEWS = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news"
 DEFAULT_NEWS_SOURCES = (
     {"name": "Trashtalk", "url": TRASHTALK_RSS, "limit": 5},
     {"name": "The Athletic", "url": ATHLETIC_RSS, "limit": 5},
 )
+LINKS_IN_MAIL = 6
 
 
 def _load_feed(source_url):
@@ -94,6 +96,49 @@ def fetch_news(source_limits=None, include_content=False, window=None):
     except Exception as e:
         logger.error(f"❌ Failed to fetch news: {e}")
         return []  # Retourne liste vide au lieu de crash
+
+
+def _fetch_espn(window):
+    """Articles d'ESPN parus dans la fenêtre : (papiers, résumés de matchs)."""
+    try:
+        response = requests.get(ESPN_NEWS, params={"limit": 50}, timeout=15)
+        response.raise_for_status()
+        entries = response.json().get("articles", [])
+    except Exception as e:
+        logger.warning(f"⚠️ ESPN news unavailable: {e}")
+        return [], []
+
+    stories, recaps = [], []
+    for entry in entries:
+        link = ((entry.get("links") or {}).get("web") or {}).get("href")
+        kind = {"HeadlineNews": stories, "Recap": recaps}.get(entry.get("type"))
+        if not link or kind is None or not entry.get("published"):
+            continue
+        published = datetime.fromisoformat(entry["published"].replace("Z", "+00:00"))
+        if window[0] <= published <= window[1]:
+            kind.append({
+                "source": "ESPN",
+                "title": entry.get("headline", "No title"),
+                "link": link.replace("http://", "https://", 1),
+                "published": published.strftime("%d %b %Y %H:%M"),
+                "summary": entry.get("description", ""),
+            })
+    return stories, recaps
+
+
+def fetch_night_links(window, count=LINKS_IN_MAIL):
+    """
+    Liens du mail. À l'heure de l'envoi, Trashtalk et The Athletic ont encore peu publié : on complète
+    avec les papiers d'ESPN de la nuit, puis ses résumés de matchs et les derniers articles de The Athletic.
+    """
+    stories, recaps = _fetch_espn(window)
+    links = fetch_news(window=window) + stories
+    if len(links) >= count:
+        return links[:count]
+    athletic = ({"name": "The Athletic", "url": ATHLETIC_RSS, "limit": count},)
+    older = fetch_news(athletic, window=(window[0] - timedelta(days=1), window[0]))
+    fill = [a for round_ in zip_longest(recaps, older) for a in round_ if a]
+    return (links + fill)[:count]
 
 
 def _scrape_article_content(url):
